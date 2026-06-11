@@ -1,0 +1,1 @@
+-- Owner: S4 | Purpose: SQLite schema — tables for sessions, questions, answers, and exports

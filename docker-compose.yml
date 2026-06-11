@@ -1,0 +1,15 @@
+# Owner: S4 | Purpose: Compose file — runs Flask API (+ optional dev tools) in containers
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend/data:/app/data
+      - ./.env:/app/.env:ro
+    environment:
+      - FLASK_ENV=development

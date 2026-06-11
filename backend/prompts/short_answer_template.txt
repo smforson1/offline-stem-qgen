@@ -1,0 +1,1 @@
+# Owner: S2 | Purpose: Prompt template for short-answer question generation

@@ -1,0 +1,7 @@
+# Owner: S4 | Purpose: Backend Python dependencies
+flask
+paddleocr
+paddlepaddle
+llama-cpp-python
+reportlab
+pillow

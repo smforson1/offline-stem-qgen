@@ -1,0 +1,36 @@
+# Large model files
+*.gguf
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.env
+
+# Sensitive pilot data (never commit)
+data/surveys/
+data/consent_forms/
+
+# Node / React Native
+node_modules/
+rn_app/node_modules/
+rn_app/.expo/
+rn_app/android/app/build/
+rn_app/ios/build/
+rn_app/.gradle/
+
+# SQLite databases
+*.db
+*.sqlite
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
