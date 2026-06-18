@@ -16,6 +16,9 @@ sys.path.append(current_dir)
 from config import Config
 from ocr_engine import OcrEngine
 from pdf_export import PdfExporter
+from prompt_builder import PromptBuilder
+from validator import Validator
+from llm_engine import LlmEngine
 
 # Configure logging
 logging.basicConfig(
@@ -38,6 +41,23 @@ def get_ocr_engine(lang: str) -> OcrEngine:
         # Always run on CPU with MKLDNN disabled for stable local CPU execution
         _ocr_engines[lang] = OcrEngine(lang=lang, device='cpu', enable_mkldnn=False)
     return _ocr_engines[lang]
+
+# Global cache of LLM engine and Prompt Builder
+_llm_engine = None
+_prompt_builder = None
+
+def get_llm_engine() -> LlmEngine:
+    global _llm_engine
+    if _llm_engine is None:
+        logger.info("Initializing LlmEngine...")
+        _llm_engine = LlmEngine(model_path=Config.MODEL_PATH)
+    return _llm_engine
+
+def get_prompt_builder() -> PromptBuilder:
+    global _prompt_builder
+    if _prompt_builder is None:
+        _prompt_builder = PromptBuilder()
+    return _prompt_builder
 
 def init_db():
     """Initializes the database using schema.sql if the schema doesn't exist yet."""
@@ -145,11 +165,110 @@ def ocr_endpoint():
 
 @app.route("/generate", methods=["POST"])
 def generate():
-    """Stub for LLM question generation."""
-    return jsonify({
-        "success": False,
-        "error": "Endpoint `/generate` is not implemented yet. LLM engine is undergoing configuration."
-    }), 501
+    """
+    POST /generate
+    Generates STEM practice questions from OCR'd text using a local LLM.
+    Body format:
+    {
+      "context_text": "textbook text...",
+      "subject": "Physics",           # optional
+      "difficulty": "Medium",         # optional
+      "question_type": "mcq",         # optional (mcq or short_answer)
+      "session_id": "optional_id"     # optional, auto-generated if missing
+    }
+    """
+    import uuid
+    import json
+    data = request.get_json(silent=True) or {}
+    
+    context_text = data.get("context_text")
+    if not context_text or not isinstance(context_text, str):
+        return jsonify({
+            "success": False,
+            "error": "Missing or invalid 'context_text' in JSON body."
+        }), 400
+
+    subject = data.get("subject", "STEM")
+    difficulty = data.get("difficulty", "Medium")
+    question_type = data.get("question_type", "mcq")
+    
+    # Resolve or create session ID
+    session_id = data.get("session_id")
+    if not session_id:
+        session_id = f"sess_{uuid.uuid4().hex[:12]}"
+
+    try:
+        # 1. Compile prompt using builder
+        prompt_builder = get_prompt_builder()
+        prompt = prompt_builder.build_prompt(
+            context_text=context_text,
+            subject=subject,
+            difficulty=difficulty,
+            question_type=question_type
+        )
+        
+        # 2. Query LlmEngine
+        llm = get_llm_engine()
+        raw_response = llm.generate_response(prompt)
+        
+        # 3. Validate and Parse response JSON
+        questions = Validator.validate_and_parse_response(
+            raw_llm_text=raw_response,
+            question_type=question_type
+        )
+        
+        # 4. Insert into SQLite Database
+        conn = get_db_connection()
+        # Insert session (ignoring if it already exists)
+        conn.execute(
+            "INSERT OR IGNORE INTO sessions (id, subject, difficulty, raw_context) VALUES (?, ?, ?, ?)",
+            (session_id, subject, difficulty, context_text)
+        )
+        
+        # Insert questions
+        for idx, q in enumerate(questions):
+            q_id = f"q_{session_id}_{idx}_{uuid.uuid4().hex[:6]}"
+            conn.execute(
+                "INSERT INTO questions (id, session_id, question_text, correct_answer, explanation, options_json) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    q_id,
+                    session_id,
+                    q["question_text"],
+                    q["correct_answer"],
+                    q["explanation"],
+                    q["options_json"]
+                )
+            )
+        conn.commit()
+        conn.close()
+        
+        # 5. Formulate final response (including the DB-inserted UUIDs)
+        # Convert options back to list for response output
+        response_questions = []
+        for idx, q in enumerate(questions):
+            opts = None
+            if q["options_json"]:
+                opts = json.loads(q["options_json"])
+            response_questions.append({
+                "question_text": q["question_text"],
+                "options": opts,
+                "correct_answer": q["correct_answer"],
+                "explanation": q["explanation"]
+            })
+            
+        return jsonify({
+            "success": True,
+            "session_id": session_id,
+            "questions": response_questions
+        }), 200
+
+    except Exception as e:
+        logger.exception("Question generation route failed")
+        return jsonify({
+            "success": False,
+            "error": f"Failed to generate questions: {str(e)}"
+        }), 500
+
 
 @app.route("/export", methods=["POST"])
 def export():

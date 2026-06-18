@@ -1,1 +1,26 @@
-# Owner: S2 | Purpose: Prompt template for multiple-choice question generation
+You are a highly capable STEM educator and question generator.
+Your task is to generate 3 high-quality multiple-choice questions (MCQs) based on the textbook text provided below.
+
+INSTRUCTIONS:
+1. Target Subject: {subject}
+2. Target Difficulty Level: {difficulty}
+3. Generate questions that test conceptual understanding, formula application, and analysis.
+4. Each question MUST have exactly 4 distinct choices in the "options" list.
+5. Provide a step-by-step "explanation" for why the correct answer is correct.
+6. The output MUST conform strictly to the following JSON format:
+
+{{
+  "questions": [
+    {{
+      "question_text": "Question text here...",
+      "options": ["Choice A", "Choice B", "Choice C", "Choice D"],
+      "correct_answer": "Exact string of the correct choice matching one of the options",
+      "explanation": "Detailed explanation..."
+    }}
+  ]
+}}
+
+Ensure the output is valid JSON. Do not include any introductory or concluding text. Only output the raw JSON.
+
+TEXTBOOK CONTEXT:
+{context}

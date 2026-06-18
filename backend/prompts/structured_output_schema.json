@@ -1,1 +1,38 @@
-{}
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "STEMQuestionList",
+  "type": "object",
+  "properties": {
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question_text": {
+            "type": "string",
+            "description": "The text of the practice question."
+          },
+          "correct_answer": {
+            "type": "string",
+            "description": "The correct answer value."
+          },
+          "explanation": {
+            "type": "string",
+            "description": "Step-by-step explanation or derivation of the correct answer."
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 4,
+            "maxItems": 4,
+            "description": "Four multiple choice choices (A, B, C, D). Set to null or omit for short answer/free response."
+          }
+        },
+        "required": ["question_text", "correct_answer", "explanation"]
+      }
+    }
+  },
+  "required": ["questions"]
+}

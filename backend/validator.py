@@ -1,1 +1,117 @@
-# Owner: S2 | Purpose: Post-processes and validates LLM output (JSON schema, answer sanity checks)
+# Owner: S2 | Purpose: Output validator — ensures LLM output conforms to structured JSON schema
+
+import json
+import logging
+from typing import Dict, List, Any
+
+logger = logging.getLogger(__name__)
+
+class Validator:
+    @staticmethod
+    def clean_llm_json(raw_text: str) -> str:
+        """
+        Cleans markdown code blocks (e.g. ```json ... ```) from the raw LLM output.
+        """
+        text = raw_text.strip()
+        if text.startswith("```"):
+            # Find the first line break
+            first_newline = text.find("\n")
+            if first_newline != -1:
+                # Remove starting ```json or ```
+                text = text[first_newline:].strip()
+            if text.endswith("```"):
+                text = text[:-3].strip()
+        return text
+
+    @staticmethod
+    def validate_and_parse_response(raw_llm_text: str, question_type: str = "mcq") -> List[Dict[str, Any]]:
+        """
+        Parses and validates the raw JSON response from the LLM.
+        
+        Args:
+            raw_llm_text: The raw output string from llama.cpp.
+            question_type: 'mcq' or 'short_answer'.
+            
+        Returns:
+            A list of validated question dictionaries with keys:
+            - 'question_text': str
+            - 'correct_answer': str
+            - 'explanation': str
+            - 'options_json': str (JSON string list or None)
+        """
+        cleaned_text = Validator.clean_llm_json(raw_llm_text)
+        try:
+            data = json.loads(cleaned_text)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse LLM response as JSON: {str(e)}")
+            logger.debug(f"Raw cleaned text: {cleaned_text}")
+            raise ValueError(f"LLM output is not valid JSON: {str(e)}") from e
+
+        if not isinstance(data, dict) or "questions" not in data:
+            raise ValueError("LLM JSON root must be a dictionary containing a 'questions' key.")
+
+        questions = data["questions"]
+        if not isinstance(questions, list):
+            raise ValueError("'questions' key in JSON must point to an array.")
+
+        validated_questions = []
+        q_type_normalized = question_type.lower()
+        
+        for idx, q in enumerate(questions):
+            if not isinstance(q, dict):
+                raise ValueError(f"Question at index {idx} must be a JSON object.")
+
+            # Required fields
+            q_text = q.get("question_text")
+            corr_ans = q.get("correct_answer")
+            explanation = q.get("explanation")
+
+            if not q_text or not isinstance(q_text, str):
+                raise ValueError(f"Question at index {idx} has missing or invalid 'question_text'.")
+            if not corr_ans or not isinstance(corr_ans, str):
+                raise ValueError(f"Question at index {idx} has missing or invalid 'correct_answer'.")
+            if not explanation or not isinstance(explanation, str):
+                raise ValueError(f"Question at index {idx} has missing or invalid 'explanation'.")
+
+            # Check question type constraints
+            options = q.get("options")
+            
+            validated_q = {
+                "question_text": q_text.strip(),
+                "correct_answer": corr_ans.strip(),
+                "explanation": explanation.strip(),
+                "options_json": None
+            }
+
+            if q_type_normalized in ("mcq", "multiple_choice", "multiple-choice"):
+                if not isinstance(options, list) or len(options) != 4:
+                    raise ValueError(f"Question {idx+1} ('{q_text[:30]}...') is multiple choice but options list does not have exactly 4 items.")
+                
+                # Check option types are strings
+                for opt_idx, opt in enumerate(options):
+                    if not isinstance(opt, str) or not opt.strip():
+                        raise ValueError(f"Question {idx+1} option at index {opt_idx} is not a valid string.")
+                
+                # Check if correct answer matches one of the options (case-insensitive fuzzy match)
+                clean_opts = [o.strip() for o in options]
+                clean_corr_ans = corr_ans.strip()
+                
+                if clean_corr_ans not in clean_opts:
+                    matched_opt = None
+                    for o in clean_opts:
+                        if clean_corr_ans.lower() == o.lower() or clean_corr_ans.lower() in o.lower():
+                            matched_opt = o
+                            break
+                    if matched_opt:
+                        validated_q["correct_answer"] = matched_opt
+                    else:
+                        raise ValueError(f"Question {idx+1} correct answer '{corr_ans}' does not match any of the options: {options}.")
+                
+                validated_q["options_json"] = json.dumps(clean_opts)
+            else:
+                # Short Answer / Free response
+                validated_q["options_json"] = None
+
+            validated_questions.append(validated_q)
+
+        return validated_questions

@@ -11,6 +11,7 @@ class Config:
     DATABASE_PATH = os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR, "stem_qgen.db"))
     UPLOADS_DIR = os.environ.get("UPLOADS_DIR", os.path.join(BASE_DIR, "data", "uploads"))
     OCR_LANG = os.environ.get("OCR_LANG", "en")
+    MODEL_PATH = os.environ.get("MODEL_PATH", os.path.join(BASE_DIR, "data", "models", "model.gguf"))
     
     # Make sure the uploads directory is created at startup
     os.makedirs(UPLOADS_DIR, exist_ok=True)
