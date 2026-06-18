@@ -4,7 +4,9 @@ import os
 import sys
 import time
 import logging
-from flask import Flask, request, jsonify
+import io
+import sqlite3
+from flask import Flask, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 
 # Add current directory to path to locate config and ocr_engine
@@ -13,6 +15,7 @@ sys.path.append(current_dir)
 
 from config import Config
 from ocr_engine import OcrEngine
+from pdf_export import PdfExporter
 
 # Configure logging
 logging.basicConfig(
@@ -35,6 +38,33 @@ def get_ocr_engine(lang: str) -> OcrEngine:
         # Always run on CPU with MKLDNN disabled for stable local CPU execution
         _ocr_engines[lang] = OcrEngine(lang=lang, device='cpu', enable_mkldnn=False)
     return _ocr_engines[lang]
+
+def init_db():
+    """Initializes the database using schema.sql if the schema doesn't exist yet."""
+    db_path = Config.DATABASE_PATH
+    schema_path = os.path.join(current_dir, "schema.sql")
+    
+    db_exists = os.path.exists(db_path)
+    if not db_exists:
+        logger.info(f"Database file not found. Creating at {db_path}...")
+
+    try:
+        conn = sqlite3.connect(db_path)
+        with open(schema_path, "r", encoding="utf-8") as f:
+            schema_sql = f.read()
+        conn.executescript(schema_sql)
+        conn.commit()
+        conn.close()
+        logger.info("SQLite Database tables verified/initialized successfully.")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {str(e)}")
+
+def get_db_connection():
+    """Returns a new SQLite connection with dict-like row parsing."""
+    conn = sqlite3.connect(Config.DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
 
 @app.after_request
 def add_cors_headers(response):
@@ -123,12 +153,98 @@ def generate():
 
 @app.route("/export", methods=["POST"])
 def export():
-    """Stub for ReportLab PDF generation."""
-    return jsonify({
-        "success": False,
-        "error": "Endpoint `/export` is not implemented yet. PDF export engine is undergoing configuration."
-    }), 501
+    """
+    POST /export
+    Compiles questions into a ReportLab PDF download.
+    Can accept:
+    1. A list of questions passed directly in the JSON body.
+    2. A 'session_id' in JSON body or query param to retrieve questions from the SQLite DB.
+    """
+    data = request.get_json(silent=True)
+    if data is None:
+        data = {}
+    questions = []
+    subject = "STEM"
+    difficulty = "Medium"
+
+    # 1. Check if session_id is provided to fetch from SQLite Database
+    session_id = None
+    if isinstance(data, dict):
+        session_id = data.get("session_id")
+    if not session_id:
+        session_id = request.args.get("session_id")
+    if session_id:
+        try:
+            conn = get_db_connection()
+            session = conn.execute(
+                "SELECT subject, difficulty FROM sessions WHERE id = ?", (session_id,)
+            ).fetchone()
+            
+            if not session:
+                conn.close()
+                return jsonify({
+                    "success": False,
+                    "error": f"Session with ID '{session_id}' not found."
+                }), 404
+                
+            subject = session["subject"]
+            difficulty = session["difficulty"]
+            
+            db_qs = conn.execute(
+                "SELECT question_text, correct_answer, explanation, options_json FROM questions WHERE session_id = ?",
+                (session_id,)
+            ).fetchall()
+            conn.close()
+            
+            questions = [dict(q) for q in db_qs]
+            
+        except Exception as e:
+            logger.exception("Database query failed during PDF export")
+            return jsonify({
+                "success": False,
+                "error": f"Failed to retrieve questions from database: {str(e)}"
+            }), 500
+    else:
+        # 2. Otherwise expect raw questions in the body
+        if isinstance(data, list):
+            questions = data
+        elif isinstance(data, dict):
+            questions = data.get("questions", [])
+            subject = data.get("subject", subject)
+            difficulty = data.get("difficulty", difficulty)
+
+    if not questions:
+        return jsonify({
+            "success": False,
+            "error": "No questions provided or found for the given session ID."
+        }), 400
+
+    try:
+        # 3. Generate PDF Bytes
+        pdf_bytes = PdfExporter.generate_pdf_bytes(
+            questions, 
+            subject=subject, 
+            difficulty=difficulty
+        )
+        
+        # 4. Stream PDF
+        return send_file(
+            io.BytesIO(pdf_bytes),
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=f"{subject.lower()}_practice_worksheet.pdf"
+        )
+        
+    except Exception as e:
+        logger.exception("PDF generation failed in export route")
+        return jsonify({
+            "success": False,
+            "error": f"Failed to generate PDF: {str(e)}"
+        }), 500
 
 if __name__ == "__main__":
+    # Initialize SQLite Database tables
+    init_db()
+    
     logger.info(f"Starting offline-stem-qgen API server on {Config.HOST}:{Config.PORT}...")
     app.run(host=Config.HOST, port=Config.PORT, debug=False)
