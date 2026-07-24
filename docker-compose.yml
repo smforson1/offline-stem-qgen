@@ -9,7 +9,13 @@ services:
     ports:
       - "5000:5000"
     volumes:
+      # Mount backend/data on the host to /app/data inside the container to persist sqlite DB, uploads, and models
       - ./backend/data:/app/data
-      - ./.env:/app/.env:ro
     environment:
+      - HOST=0.0.0.0
+      - PORT=5000
+      # Route storage paths inside the container to the persistent /app/data volume
+      - DATABASE_PATH=/app/data/stem_qgen.db
+      - UPLOADS_DIR=/app/data/uploads
+      - MODEL_PATH=/app/data/models/model.gguf
       - FLASK_ENV=development
