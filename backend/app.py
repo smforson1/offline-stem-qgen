@@ -273,6 +273,126 @@ def generate():
         }), 500
 
 
+@app.route("/generate/stream", methods=["POST"])
+def generate_stream():
+    """
+    POST /generate/stream
+    Same parameters as /generate but responds with Server-Sent Events (SSE).
+
+    The stream emits three event types:
+      - "progress"  : {"question_index": N, "total": T} — fires as each question is extracted
+      - "done"      : {"session_id": "...", "questions": [...]} — full payload when complete
+      - "error"     : {"error": "..."} — if anything goes wrong
+
+    The frontend consumes this with a plain fetch + ReadableStream so questions
+    can be shown one-by-one as they arrive instead of waiting for the full response.
+    """
+    import uuid
+    import json
+    from flask import Response, stream_with_context
+
+    data = request.get_json(silent=True) or {}
+
+    context_text = data.get("context_text")
+    if not context_text or not isinstance(context_text, str):
+        return jsonify({"success": False, "error": "Missing or invalid 'context_text'."}), 400
+
+    subject = data.get("subject", "STEM")
+    difficulty = data.get("difficulty", "Medium")
+    question_type = data.get("question_type", "mcq")
+    num_questions = int(data.get("num_questions", 3))
+
+    session_id = data.get("session_id")
+    if not session_id:
+        session_id = f"sess_{uuid.uuid4().hex[:12]}"
+
+    def sse_event(event: str, payload: dict) -> str:
+        """Format a single SSE message."""
+        return f"event: {event}\ndata: {json.dumps(payload)}\n\n"
+
+    @stream_with_context
+    def generate_sse():
+        try:
+            # Build prompt
+            prompt_builder = get_prompt_builder()
+            prompt = prompt_builder.build_prompt(
+                context_text=context_text,
+                subject=subject,
+                difficulty=difficulty,
+                question_type=question_type,
+                num_questions=num_questions,
+            )
+
+            # Accumulate streaming tokens into a single string
+            llm = get_llm_engine()
+            accumulated = ""
+            for token in llm.generate_response_stream(prompt, num_questions=num_questions):
+                accumulated += token
+                # Check how many complete questions we have so far
+                # so we can fire progress events as each one closes
+                try:
+                    partial = json.loads(accumulated + "}}")  # attempt a quick close
+                    n_so_far = len(partial.get("questions", []))
+                except Exception:
+                    n_so_far = accumulated.count('"question_text"')
+
+                if n_so_far > 0:
+                    yield sse_event("progress", {
+                        "question_index": n_so_far,
+                        "total": num_questions,
+                    })
+
+            # Full response collected — parse and validate
+            questions = Validator.validate_and_parse_response(
+                raw_llm_text=accumulated,
+                question_type=question_type,
+            )
+
+            # Persist to SQLite
+            conn = get_db_connection()
+            conn.execute(
+                "INSERT OR IGNORE INTO sessions (id, subject, difficulty, raw_context) VALUES (?, ?, ?, ?)",
+                (session_id, subject, difficulty, context_text),
+            )
+            for idx, q in enumerate(questions):
+                q_id = f"q_{session_id}_{idx}_{uuid.uuid4().hex[:6]}"
+                conn.execute(
+                    "INSERT INTO questions (id, session_id, question_text, correct_answer, explanation, options_json) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (q_id, session_id, q["question_text"], q["correct_answer"], q["explanation"], q["options_json"]),
+                )
+            conn.commit()
+            conn.close()
+
+            # Build final questions list for the "done" event
+            response_questions = []
+            for q in questions:
+                opts = json.loads(q["options_json"]) if q["options_json"] else None
+                response_questions.append({
+                    "question_text": q["question_text"],
+                    "options": opts,
+                    "correct_answer": q["correct_answer"],
+                    "explanation": q["explanation"],
+                })
+
+            yield sse_event("done", {
+                "session_id": session_id,
+                "questions": response_questions,
+            })
+
+        except Exception as e:
+            logger.exception("Streaming generation failed")
+            yield sse_event("error", {"error": str(e)})
+
+    return Response(
+        generate_sse(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",   # Disable nginx buffering if behind a proxy
+        },
+    )
+
 @app.route("/export", methods=["POST"])
 def export():
     """

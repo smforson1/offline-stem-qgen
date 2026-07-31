@@ -98,6 +98,42 @@ class LlmEngine:
             logger.error(f"Error during GGUF model inference: {str(e)}")
             raise RuntimeError(f"LLM inference failed: {str(e)}") from e
 
+    def generate_response_stream(self, prompt: str, num_questions: int = 3):
+        """
+        Generator version of generate_response — yields raw text chunks as they
+        are produced by llama.cpp so the caller can stream them to the client.
+        Falls back to yielding the full mock response as a single chunk.
+        """
+        if self.mock_mode:
+            logger.info("Mock mode: yielding full mock response as single stream chunk...")
+            yield self._generate_mock_questions(prompt, num_questions=num_questions)
+            return
+
+        model = self._get_model()
+        if self.mock_mode:
+            yield self._generate_mock_questions(prompt, num_questions=num_questions)
+            return
+
+        max_tokens = 100 + (num_questions * 160)
+        logger.info(f"Running streaming GGUF inference (num_questions={num_questions}, max_tokens={max_tokens})...")
+
+        try:
+            stream = model(
+                prompt,
+                max_tokens=max_tokens,
+                temperature=0.2,
+                top_p=0.95,
+                stop=["\n\n\n", "[INST]", "```"],
+                stream=True,
+            )
+            for chunk in stream:
+                token = chunk["choices"][0].get("text", "")
+                if token:
+                    yield token
+        except Exception as e:
+            logger.error(f"Error during streaming GGUF inference: {str(e)}")
+            raise RuntimeError(f"LLM streaming inference failed: {str(e)}") from e
+
     def _generate_mock_questions(self, prompt: str, num_questions: int = 3) -> str:
         """
         Generates dynamic mock questions based on the terms found in the prompt context.

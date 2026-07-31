@@ -12,7 +12,7 @@ import { RootStackParamList } from '../types/Navigation';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useSessionStore } from '../store/useSessionStore';
 import { uploadImageForOcr } from '../api/ocrApi';
-import { generateQuestions } from '../api/generateApi';
+import { generateQuestionsStream } from '../api/generateApi';
 import { sessionRepository } from '../db/sessionRepository';
 import { questionRepository } from '../db/questionRepository';
 import { LoadingOverlay } from '../components/LoadingOverlay';
@@ -57,21 +57,46 @@ export const CaptureScreen: React.FC = () => {
     try {
       setLoading(true);
       setLoadingStep('AI is generating questions...');
-      const resGen = await generateQuestions(text, settings.defaultSubject, settings.defaultDifficulty, settings.defaultQuestionType);
-      if (!resGen.success || !resGen.questions || resGen.questions.length === 0) {
-        throw new Error(resGen.error || 'Server did not return questions.');
-      }
-      setLoadingStep('Saving session to local storage...');
-      const newSession = {
-        id: resGen.session_id, subject: settings.defaultSubject,
-        difficulty: settings.defaultDifficulty, raw_context: text,
-        created_at: new Date().toISOString(),
-      };
-      await sessionRepository.saveSession(newSession);
-      await questionRepository.saveQuestions(resGen.questions, resGen.session_id);
-      sessionStore.startSession(newSession, resGen.questions);
-      setLoading(false);
-      navigation.replace('Question', { sessionId: resGen.session_id });
+
+      const numQuestions = settings.defaultQuestionCount ?? 5;
+
+      await generateQuestionsStream(
+        text,
+        settings.defaultSubject,
+        settings.defaultDifficulty,
+        settings.defaultQuestionType,
+        numQuestions,
+        // onProgress — update the overlay message as each question arrives
+        ({ question_index, total }) => {
+          setLoadingStep(`Got question ${question_index} of ${total}...`);
+        },
+        // onDone — full list received, save and navigate
+        async ({ session_id, questions }) => {
+          try {
+            setLoadingStep('Saving session to local storage...');
+            const newSession = {
+              id: session_id,
+              subject: settings.defaultSubject,
+              difficulty: settings.defaultDifficulty,
+              raw_context: text,
+              created_at: new Date().toISOString(),
+            };
+            await sessionRepository.saveSession(newSession);
+            await questionRepository.saveQuestions(questions, session_id);
+            sessionStore.startSession(newSession, questions);
+            setLoading(false);
+            navigation.replace('Question', { sessionId: session_id });
+          } catch (e: any) {
+            setLoading(false);
+            alert(`Failed to save session: ${e.message}`);
+          }
+        },
+        // onError
+        (message) => {
+          setLoading(false);
+          alert(`Generation failed: ${message}`);
+        },
+      );
     } catch (e: any) {
       setLoading(false);
       alert(`Generation failed: ${e.message || 'Check your local server connection.'}`);
