@@ -17,6 +17,7 @@ import { sessionRepository } from '../db/sessionRepository';
 import { questionRepository } from '../db/questionRepository';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import { Colors, Fonts } from '../theme/colors';
+import { CameraOff, Lock, Ban } from 'lucide-react-native';
 
 type CaptureScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Capture'>;
 
@@ -114,7 +115,7 @@ export const CaptureScreen: React.FC = () => {
         <View style={styles.centeredBody}>
           <View style={styles.infoCard}>
             <View style={[styles.iconWrap, { backgroundColor: Colors.primarySoft }]}>
-              <Text style={{ fontSize: 40 }}>📷</Text>
+              <CameraOff size={40} color={Colors.primary} />
             </View>
             <Text style={styles.cardTitle}>No Camera Detected</Text>
             <Text style={styles.cardDesc}>
@@ -147,7 +148,7 @@ export const CaptureScreen: React.FC = () => {
         <View style={styles.centeredBody}>
           <View style={styles.infoCard}>
             <View style={[styles.iconWrap, { backgroundColor: permissionDenied ? Colors.errorSoft : Colors.primarySoft }]}>
-              <Text style={{ fontSize: 40 }}>{permissionDenied ? '🚫' : '🔒'}</Text>
+              {permissionDenied ? <Ban size={40} color={Colors.error} /> : <Lock size={40} color={Colors.primary} />}
             </View>
             <Text style={styles.cardTitle}>
               {permissionDenied ? 'Permission Denied' : 'Camera Permission Required'}

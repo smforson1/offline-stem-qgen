@@ -10,6 +10,7 @@ import { Session } from '../types/Session';
 import { sessionRepository } from '../db/sessionRepository';
 import { questionRepository } from '../db/questionRepository';
 import { Colors, Fonts } from '../theme/colors';
+import { BookCopy } from 'lucide-react-native';
 
 type HistoryScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainTabs'>;
 
@@ -110,7 +111,7 @@ export const HistoryScreen: React.FC = () => {
           : null}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <View style={styles.emptyIconWrap}><Text style={{ fontSize: 40 }}>📚</Text></View>
+            <View style={styles.emptyIconWrap}><BookCopy size={40} color={Colors.primary} /></View>
             <Text style={styles.emptyTitle}>No sessions yet</Text>
             <Text style={styles.emptyDesc}>Complete your first quiz by scanning a textbook page to see history here.</Text>
           </View>

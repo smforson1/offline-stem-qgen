@@ -8,6 +8,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/Navigation';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { Colors, Fonts } from '../theme/colors';
+import { Link2, Target } from 'lucide-react-native';
 
 type SettingsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Settings'>;
 
@@ -66,7 +67,7 @@ export const SettingsScreen: React.FC = () => {
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
             <View style={[styles.cardIconBadge, { backgroundColor: Colors.primarySoft }]}>
-              <Text style={{ fontSize: 16 }}>🔗</Text>
+              <Link2 size={20} color={Colors.primary} />
             </View>
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={styles.cardTitle}>Local Gateway IP</Text>
@@ -84,7 +85,7 @@ export const SettingsScreen: React.FC = () => {
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
             <View style={[styles.cardIconBadge, { backgroundColor: Colors.accentSoft }]}>
-              <Text style={{ fontSize: 16 }}>🎯</Text>
+              <Target size={20} color={Colors.accent} />
             </View>
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={styles.cardTitle}>Inference Criteria</Text>

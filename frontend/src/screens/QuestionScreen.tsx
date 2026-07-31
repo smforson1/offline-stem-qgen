@@ -11,6 +11,7 @@ import { questionRepository } from '../db/questionRepository';
 import { sessionRepository } from '../db/sessionRepository';
 import { QuestionCard } from '../components/QuestionCard';
 import { Colors, Fonts } from '../theme/colors';
+import { Edit3, Check } from 'lucide-react-native';
 
 type QuestionScreenRouteProp = RouteProp<RootStackParamList, 'Question'>;
 type QuestionScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Question'>;
@@ -82,8 +83,9 @@ export const QuestionScreen: React.FC = () => {
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.statsRow}>
-          <View style={styles.statPill}>
-            <Text style={styles.statPillText}>📝 {answeredCount} of {totalQuestions} answered</Text>
+          <View style={[styles.statPill, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+            <Edit3 size={12} color={Colors.primary} />
+            <Text style={styles.statPillText}>{answeredCount} of {totalQuestions} answered</Text>
           </View>
           <View style={[styles.statPill, { backgroundColor: Colors.accentSoft }]}>
             <Text style={[styles.statPillText, { color: Colors.accent }]}>
@@ -113,8 +115,9 @@ export const QuestionScreen: React.FC = () => {
           </TouchableOpacity>
 
           {isLastQuestion ? (
-            <TouchableOpacity onPress={handleSubmit} style={styles.submitBtn}>
-              <Text style={styles.submitBtnText}>Finish & Grade ✔</Text>
+            <TouchableOpacity onPress={handleSubmit} style={[styles.submitBtn, { flexDirection: 'row', justifyContent: 'center', gap: 6 }]}>
+              <Text style={styles.submitBtnText}>Finish & Grade</Text>
+              <Check size={16} color={Colors.textWhite} />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
