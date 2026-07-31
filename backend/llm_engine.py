@@ -46,8 +46,9 @@ class LlmEngine:
             from llama_cpp import Llama
             self._model = Llama(
                 model_path=self.model_path,
-                n_ctx=2048,
-                n_threads=4, # Reasonable default for dual/quad core devices
+                n_ctx=1024,     # Reduced from 2048 — truncated input + short output fits easily
+                n_threads=8,    # Use 8 of the 10 available cores for inference
+                n_batch=512,    # Process more tokens in parallel
                 verbose=False
             )
             logger.info("GGUF model loaded successfully.")
@@ -74,10 +75,10 @@ class LlmEngine:
             logger.info("Running local GGUF inference...")
             output = model(
                 prompt,
-                max_tokens=2048,
-                temperature=0.2, # low temp for structured correctness
+                max_tokens=512,       # 3 JSON questions never exceed ~400 tokens
+                temperature=0.2,      # low temp for structured correctness
                 top_p=0.95,
-                stop=["\n\n\n"] # Stop at excessive whitespace to prevent runaway generation
+                stop=["\n\n\n", "[INST]", "```"]  # Stop on runaway whitespace, new prompt injection, or markdown fences
             )
             response_text = output["choices"][0]["text"].strip()
             if not response_text:

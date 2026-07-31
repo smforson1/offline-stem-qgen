@@ -5,6 +5,24 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Maximum words of OCR context to feed into the LLM.
+# A full textbook page can be 1500+ words; the model only needs ~500 to
+# generate 3 solid questions, and feeding more just burns inference time.
+_MAX_CONTEXT_WORDS = 500
+
+
+def _truncate_context(text: str, max_words: int = _MAX_CONTEXT_WORDS) -> str:
+    """Truncate OCR text to at most max_words words to keep prompt size small."""
+    words = text.split()
+    if len(words) <= max_words:
+        return text
+    truncated = " ".join(words[:max_words])
+    logger.info(
+        f"OCR context truncated from {len(words)} to {max_words} words "
+        "to speed up LLM inference."
+    )
+    return truncated
+
 class PromptBuilder:
     def __init__(self, prompts_dir: str = None):
         if prompts_dir is None:
@@ -44,6 +62,9 @@ class PromptBuilder:
         except Exception as e:
             logger.error(f"Failed to read prompt template: {str(e)}")
             raise RuntimeError(f"Failed to read prompt template at {template_path}: {str(e)}") from e
+
+        # Truncate OCR text before building the prompt to keep token count low
+        context_text = _truncate_context(context_text)
 
         # Compile variables into the template
         compiled_prompt = template.format(
