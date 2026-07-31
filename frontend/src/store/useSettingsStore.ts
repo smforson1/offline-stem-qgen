@@ -50,7 +50,7 @@ const fsStorage: StateStorage = {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      apiUrl: 'http://192.168.4.1:5000', // Default Raspberry Pi AP local IP
+      apiUrl: 'http://10.205.140.106:5000', // Default to your laptop's local IP
       defaultSubject: 'Physics',
       defaultDifficulty: 'Medium',
       defaultQuestionType: 'mcq',
