@@ -39,5 +39,12 @@
     "web": "expo start --web",
     "postinstall": "node scripts/fix-gradle.js"
   },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": ["react-native-fs", "react-native-sqlite-storage", "react-native-nitro-image"]
+      }
+    }
+  },
   "private": true
 }
