@@ -10,17 +10,21 @@ class Validator:
     @staticmethod
     def clean_llm_json(raw_text: str) -> str:
         """
-        Cleans markdown code blocks (e.g. ```json ... ```) from the raw LLM output.
+        Extracts the JSON dictionary from the raw LLM output, ignoring any surrounding markdown or text.
         """
+        import re
         text = raw_text.strip()
-        if text.startswith("```"):
-            # Find the first line break
-            first_newline = text.find("\n")
-            if first_newline != -1:
-                # Remove starting ```json or ```
-                text = text[first_newline:].strip()
-            if text.endswith("```"):
-                text = text[:-3].strip()
+        
+        # Try to find a JSON block in markdown
+        match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+            
+        # Try to find the outermost curly braces
+        match = re.search(r'(\{.*\})', text, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+            
         return text
 
     @staticmethod
