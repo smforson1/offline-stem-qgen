@@ -8,24 +8,36 @@ logger = logging.getLogger(__name__)
 
 class Validator:
     @staticmethod
-    def clean_llm_json(raw_text: str) -> str:
+    def extract_first_json_object(raw_text: str) -> str:
         """
-        Extracts the JSON dictionary from the raw LLM output, ignoring any surrounding markdown or text.
+        Finds and returns the first complete, valid JSON object in raw_text.
+
+        Uses json.JSONDecoder.raw_decode so it stops at the exact closing brace
+        of the first object and ignores any trailing text or extra data the model
+        may have appended after the JSON — which is the root cause of the
+        'Extra data' JSONDecodeError.
         """
         import re
         text = raw_text.strip()
-        
-        # Try to find a JSON block in markdown
-        match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
-        if match:
-            return match.group(1).strip()
-            
-        # Try to find the outermost curly braces
-        match = re.search(r'(\{.*\})', text, re.DOTALL)
-        if match:
-            return match.group(1).strip()
-            
-        return text
+
+        # If the model wrapped output in a markdown code fence, unwrap it first
+        fence_match = re.search(r'```(?:json)?\s*(\{.*?)\s*```', text, re.DOTALL)
+        if fence_match:
+            text = fence_match.group(1).strip()
+
+        # Find the position of the first '{' and attempt raw_decode from there.
+        # raw_decode returns (obj, end_index) and does NOT require the string to
+        # end after the object, so trailing garbage is silently ignored.
+        decoder = json.JSONDecoder()
+        start = text.find('{')
+        if start == -1:
+            raise ValueError("No JSON object found in LLM output.")
+        try:
+            obj, _ = decoder.raw_decode(text, start)
+            # Re-serialise so downstream code always gets a clean string
+            return json.dumps(obj)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Could not decode JSON from LLM output: {e}") from e
 
     @staticmethod
     def validate_and_parse_response(raw_llm_text: str, question_type: str = "mcq") -> List[Dict[str, Any]]:
@@ -43,12 +55,12 @@ class Validator:
             - 'explanation': str
             - 'options_json': str (JSON string list or None)
         """
-        cleaned_text = Validator.clean_llm_json(raw_llm_text)
         try:
+            cleaned_text = Validator.extract_first_json_object(raw_llm_text)
             data = json.loads(cleaned_text)
-        except json.JSONDecodeError as e:
+        except (json.JSONDecodeError, ValueError) as e:
             logger.error(f"Failed to parse LLM response as JSON: {str(e)}")
-            logger.debug(f"Raw cleaned text: {cleaned_text}")
+            logger.debug(f"Raw LLM output: {raw_llm_text}")
             raise ValueError(f"LLM output is not valid JSON: {str(e)}") from e
 
         if not isinstance(data, dict) or "questions" not in data:
