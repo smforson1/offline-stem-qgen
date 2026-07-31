@@ -1,13 +1,14 @@
 {
   "expo": {
     "name": "STEM QGen",
-    "slug": "frontend",
+    "slug": "stem-qgen",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.samspeedy.stemqgen",
       "infoPlist": {
         "NSCameraUsageDescription": "STEM QGen needs camera access to scan textbook pages and generate quiz questions."
       }
@@ -20,13 +21,20 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.samspeedy.frontend",
+      "package": "com.samspeedy.stemqgen",
+      "versionCode": 1,
       "permissions": [
         "android.permission.CAMERA"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "75dec8d9-c991-4240-91d1-3e9feb229480"
+      }
+    },
+    "owner": "samspeedy"
   }
 }
