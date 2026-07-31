@@ -8,15 +8,16 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/Navigation';
 import { sessionRepository } from '../db/sessionRepository';
 import { Colors, Fonts } from '../theme/colors';
+import { Settings, Camera, ClipboardList, FileText, ArrowRight } from 'lucide-react-native';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainTabs'>;
 
 const QuickActionButton = ({
-  emoji, label, onPress, tint,
-}: { emoji: string; label: string; onPress: () => void; tint: string }) => (
+  icon: Icon, label, onPress, tint,
+}: { icon: any; label: string; onPress: () => void; tint: string }) => (
   <TouchableOpacity onPress={onPress} activeOpacity={0.75} style={styles.quickAction}>
     <View style={[styles.quickActionIcon, { backgroundColor: tint }]}>
-      <Text style={{ fontSize: 20 }}>{emoji}</Text>
+      <Icon size={24} color={Colors.primary} />
     </View>
     <Text style={styles.quickActionLabel}>{label}</Text>
   </TouchableOpacity>
@@ -58,7 +59,7 @@ export const HomeScreen: React.FC = () => {
             <Text style={styles.appTitle}>STEM QGen</Text>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.settingsBtn}>
-            <Text style={{ fontSize: 18 }}>⚙️</Text>
+            <Settings size={22} color={Colors.textPrimary} />
           </TouchableOpacity>
         </View>
 
@@ -93,31 +94,31 @@ export const HomeScreen: React.FC = () => {
         {/* Quick Actions */}
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.quickActionsRow}>
-          <QuickActionButton emoji="📸" label="New Quiz" onPress={() => navigation.navigate('Settings')} tint="#EEF2FF" />
-          <QuickActionButton emoji="📋" label="History" onPress={goHistory} tint="#F5F3FF" />
-          <QuickActionButton emoji="⚙️" label="Settings" onPress={() => navigation.navigate('Settings')} tint="#EEF2FF" />
-          <QuickActionButton emoji="📄" label="Export" onPress={goHistory} tint="#F5F3FF" />
+          <QuickActionButton icon={Camera} label="New Quiz" onPress={() => navigation.navigate('Settings')} tint="#EEF2FF" />
+          <QuickActionButton icon={ClipboardList} label="History" onPress={goHistory} tint="#F5F3FF" />
+          <QuickActionButton icon={Settings} label="Settings" onPress={() => navigation.navigate('Settings')} tint="#EEF2FF" />
+          <QuickActionButton icon={FileText} label="Export" onPress={goHistory} tint="#F5F3FF" />
         </View>
 
         {/* CTA cards */}
         <Text style={styles.sectionTitle}>Start Learning</Text>
         <TouchableOpacity activeOpacity={0.88} onPress={() => navigation.navigate('Settings')} style={styles.ctaPrimary}>
           <View style={styles.ctaTextBlock}>
-            <Text style={styles.ctaTitle}>Generate Quiz 📸</Text>
+            <Text style={styles.ctaTitle}>Generate Quiz</Text>
             <Text style={styles.ctaDesc}>Point your camera at any textbook page. AI generates custom questions instantly.</Text>
           </View>
           <View style={styles.ctaArrow}>
-            <Text style={{ fontFamily: Fonts.bold, color: Colors.primary, fontSize: 18 }}>→</Text>
+            <ArrowRight size={20} color={Colors.primary} />
           </View>
         </TouchableOpacity>
 
         <TouchableOpacity activeOpacity={0.88} onPress={goHistory} style={styles.ctaSecondary}>
           <View style={styles.ctaTextBlock}>
-            <Text style={styles.ctaSecTitle}>Review History 📚</Text>
+            <Text style={styles.ctaSecTitle}>Review History</Text>
             <Text style={styles.ctaSecDesc}>Revisit past worksheets, check scores and export PDFs.</Text>
           </View>
           <View style={styles.ctaSecArrow}>
-            <Text style={{ fontFamily: Fonts.bold, color: Colors.primary, fontSize: 18 }}>→</Text>
+            <ArrowRight size={20} color={Colors.primary} />
           </View>
         </TouchableOpacity>
 

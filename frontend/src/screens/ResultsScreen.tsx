@@ -13,6 +13,7 @@ import { Question } from '../types/Question';
 import { Session } from '../types/Session';
 import { QuestionCard } from '../components/QuestionCard';
 import { Colors, Fonts } from '../theme/colors';
+import { Trophy, ThumbsUp, BookOpen, FileText, ClipboardList } from 'lucide-react-native';
 
 type ResultsScreenRouteProp = RouteProp<RootStackParamList, 'Results'>;
 type ResultsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Results'>;
@@ -52,10 +53,10 @@ export const ResultsScreen: React.FC = () => {
 
   const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
   const tier = percentage >= 80
-    ? { label: 'Mastery Achieved', color: Colors.success, soft: Colors.successSoft, emoji: '🏆' }
+    ? { label: 'Mastery Achieved', color: Colors.success, soft: Colors.successSoft, icon: Trophy }
     : percentage >= 50
-    ? { label: 'Competent Effort', color: Colors.primary, soft: Colors.primarySoft, emoji: '👍' }
-    : { label: 'Needs More Practice', color: Colors.error, soft: Colors.errorSoft, emoji: '📖' };
+    ? { label: 'Competent Effort', color: Colors.primary, soft: Colors.primarySoft, icon: ThumbsUp }
+    : { label: 'Needs More Practice', color: Colors.error, soft: Colors.errorSoft, icon: BookOpen };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
@@ -70,7 +71,7 @@ export const ResultsScreen: React.FC = () => {
         {/* Score hero card */}
         <View style={[styles.scoreCard, { borderColor: tier.color + '33', backgroundColor: tier.soft }]}>
           <View style={[styles.scoreBadge, { backgroundColor: tier.color }]}>
-            <Text style={{ fontSize: 28 }}>{tier.emoji}</Text>
+            <tier.icon size={32} color="#FFFFFF" />
           </View>
           <Text style={[styles.tierLabel, { color: tier.color }]}>{tier.label}</Text>
           <View style={styles.scoreFractionRow}>
@@ -104,11 +105,11 @@ export const ResultsScreen: React.FC = () => {
           <TouchableOpacity onPress={handleExportPdf} disabled={pdfLoading} activeOpacity={0.85} style={styles.pdfBtn}>
             {pdfLoading
               ? <ActivityIndicator size="small" color={Colors.textWhite} style={{ marginRight: 8 }} />
-              : <Text style={styles.pdfBtnIcon}>📄</Text>}
+              : <FileText size={18} color={Colors.textWhite} style={{ marginRight: 6 }} />}
             <Text style={styles.pdfBtnText}>{pdfLoading ? 'Compiling...' : 'Export PDF'}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('MainTabs')} activeOpacity={0.85} style={styles.historyBtn}>
-            <Text style={styles.historyBtnIcon}>📋</Text>
+            <ClipboardList size={18} color={Colors.textPrimary} style={{ marginRight: 6 }} />
             <Text style={styles.historyBtnText}>History</Text>
           </TouchableOpacity>
         </View>

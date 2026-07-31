@@ -28,12 +28,14 @@ import { Colors, Fonts } from './src/theme/colors';
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
+import { Home, ClipboardList } from 'lucide-react-native';
+
 const TabIcon = ({
-  emoji,
+  icon: Icon,
   label,
   focused,
 }: {
-  emoji: string;
+  icon: any;
   label: string;
   focused: boolean;
 }) => (
@@ -49,7 +51,7 @@ const TabIcon = ({
         marginBottom: 2,
       }}
     >
-      <Text style={{ fontSize: 16 }}>{emoji}</Text>
+      <Icon size={20} color={focused ? Colors.primary : Colors.textMuted} />
     </View>
     <Text
       style={{
@@ -94,7 +96,7 @@ function MainTabs() {
         component={HomeScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="🏠" label="Home" focused={focused} />
+            <TabIcon icon={Home} label="Home" focused={focused} />
           ),
         }}
       />
@@ -103,7 +105,7 @@ function MainTabs() {
         component={HistoryScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="📋" label="History" focused={focused} />
+            <TabIcon icon={ClipboardList} label="History" focused={focused} />
           ),
         }}
       />

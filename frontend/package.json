@@ -11,6 +11,7 @@
     "expo": "~56.0.18",
     "expo-build-properties": "~56.0.24",
     "expo-status-bar": "~56.0.4",
+    "lucide-react-native": "^1.28.0",
     "nativewind": "^4.2.5",
     "react": "19.2.3",
     "react-native": "0.85.3",
@@ -21,6 +22,7 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-sqlite-storage": "^6.0.1",
+    "react-native-svg": "15.15.4",
     "react-native-vision-camera": "^5.0.11",
     "react-native-worklets": "0.8.3",
     "zustand": "^5.0.14"
@@ -42,7 +44,11 @@
   "expo": {
     "doctor": {
       "reactNativeDirectoryCheck": {
-        "exclude": ["react-native-fs", "react-native-sqlite-storage", "react-native-nitro-image"]
+        "exclude": [
+          "react-native-fs",
+          "react-native-sqlite-storage",
+          "react-native-nitro-image"
+        ]
       }
     }
   },
