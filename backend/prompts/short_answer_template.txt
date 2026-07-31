@@ -1,4 +1,4 @@
-<s>[INST] You are a STEM question generator. Output ONLY a valid JSON object. No explanations, no markdown, no extra text. Only the JSON.
+[INST] You are a STEM question generator. Output ONLY a valid JSON object. No explanations, no markdown, no extra text. Only the JSON.
 
 Subject: {subject}
 Difficulty: {difficulty}
