@@ -32,9 +32,8 @@
     },
     "extra": {
       "eas": {
-        "projectId": "75dec8d9-c991-4240-91d1-3e9feb229480"
+        "projectId": ""
       }
-    },
-    "owner": "samspeedy"
+    }
   }
 }
