@@ -16,7 +16,11 @@ import {
   Poppins_800ExtraBold,
   Poppins_900Black,
 } from '@expo-google-fonts/poppins';
-import { RootStackParamList, MainTabParamList } from './src/types/Navigation';
+import { RootStackParamList, MainTabParamList, AuthStackParamList } from './src/types/Navigation';
+import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import { SignInScreen } from './src/screens/SignInScreen';
+import { SignUpScreen } from './src/screens/SignUpScreen';
+import { useAuthStore } from './src/store/useAuthStore';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { CaptureScreen } from './src/screens/CaptureScreen';
@@ -26,6 +30,7 @@ import { HistoryScreen } from './src/screens/HistoryScreen';
 import { Colors, Fonts } from './src/theme/colors';
 
 const Stack = createStackNavigator<RootStackParamList>();
+const Auth = createStackNavigator<AuthStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 import { Home, ClipboardList } from 'lucide-react-native';
@@ -114,21 +119,38 @@ function MainTabs() {
 }
 
 function AppContent() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const hasSeenOnboarding = useAuthStore((state) => state.hasSeenOnboarding);
+
   return (
     <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName="MainTabs"
-        screenOptions={{
-          headerShown: false,
-          cardStyle: { backgroundColor: Colors.surface },
-        }}
-      >
-        <Stack.Screen name="MainTabs" component={MainTabs} />
-        <Stack.Screen name="Settings" component={SettingsScreen} />
-        <Stack.Screen name="Capture" component={CaptureScreen} />
-        <Stack.Screen name="Question" component={QuestionScreen} />
-        <Stack.Screen name="Results" component={ResultsScreen} />
-      </Stack.Navigator>
+      {isAuthenticated ? (
+        <Stack.Navigator
+          initialRouteName="MainTabs"
+          screenOptions={{
+            headerShown: false,
+            cardStyle: { backgroundColor: Colors.surface },
+          }}
+        >
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="Capture" component={CaptureScreen} />
+          <Stack.Screen name="Question" component={QuestionScreen} />
+          <Stack.Screen name="Results" component={ResultsScreen} />
+        </Stack.Navigator>
+      ) : (
+        <Auth.Navigator
+          initialRouteName={hasSeenOnboarding ? 'SignIn' : 'Onboarding'}
+          screenOptions={{
+            headerShown: false,
+            cardStyle: { backgroundColor: Colors.surface },
+          }}
+        >
+          <Auth.Screen name="Onboarding" component={OnboardingScreen} />
+          <Auth.Screen name="SignIn" component={SignInScreen} />
+          <Auth.Screen name="SignUp" component={SignUpScreen} />
+        </Auth.Navigator>
+      )}
       <StatusBar style="dark" />
     </NavigationContainer>
   );

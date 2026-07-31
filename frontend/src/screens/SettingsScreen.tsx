@@ -7,8 +7,9 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/Navigation';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { Colors, Fonts } from '../theme/colors';
-import { Link2, Target } from 'lucide-react-native';
+import { Link2, Target, LogOut } from 'lucide-react-native';
 
 type SettingsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Settings'>;
 
@@ -37,6 +38,7 @@ const ChipGroup = ({ label, options, selected, onSelect }: {
 export const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<SettingsScreenNavigationProp>();
   const settings = useSettingsStore();
+  const authStore = useAuthStore();
   const [localUrl, setLocalUrl] = useState(settings.apiUrl);
 
   const saveUrl = () => {
@@ -111,6 +113,16 @@ export const SettingsScreen: React.FC = () => {
         <TouchableOpacity activeOpacity={0.85} onPress={handleProceed} style={styles.proceedBtn}>
           <Text style={styles.proceedBtnText}>Proceed to Capture</Text>
         </TouchableOpacity>
+
+        <View style={styles.logoutWrapper}>
+          <Text style={styles.currentUserText}>
+            Logged in as {authStore.user?.name || 'Student'}
+          </Text>
+          <TouchableOpacity activeOpacity={0.75} onPress={() => authStore.logout()} style={styles.logoutBtn}>
+            <LogOut size={16} color={Colors.error} style={{ marginRight: 6 }} />
+            <Text style={styles.logoutBtnText}>Log Out</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -142,4 +154,8 @@ const styles = StyleSheet.create({
   chipTextActive: { fontFamily: Fonts.bold, color: Colors.primary },
   proceedBtn: { backgroundColor: Colors.primary, borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 8, shadowColor: Colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
   proceedBtnText: { fontSize: 15, fontFamily: Fonts.bold, color: Colors.textWhite, letterSpacing: 0.2 },
+  logoutWrapper: { marginTop: 40, alignItems: 'center' },
+  currentUserText: { fontSize: 12, fontFamily: Fonts.medium, color: Colors.textMuted, marginBottom: 12 },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.errorSoft, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12 },
+  logoutBtnText: { fontSize: 13, fontFamily: Fonts.bold, color: Colors.error },
 });
