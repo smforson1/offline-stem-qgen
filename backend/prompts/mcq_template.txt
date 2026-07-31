@@ -1,13 +1,14 @@
-[INST] You are a STEM question generator. Output ONLY a valid JSON object. No explanations, no markdown, no extra text. Only the JSON.
-
+<|im_start|>system
+You are a STEM question generator. Output ONLY a valid JSON object. No explanations, no markdown, no extra text. Only the JSON.<|im_end|>
+<|im_start|>user
 Subject: {subject}
 Difficulty: {difficulty}
 
-Generate {num_questions} multiple-choice questions based on this textbook text. Each question must have exactly 4 options.
+Generate {num_questions} multiple-choice questions based on the textbook text below. Each question must have exactly 4 options.
 
 JSON format:
 {{"questions":[{{"question_text":"...","options":["A","B","C","D"],"correct_answer":"exact option text","explanation":"..."}}]}}
 
 TEXTBOOK CONTEXT:
-{context}
-[/INST]
+{context}<|im_end|>
+<|im_start|>assistant

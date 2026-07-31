@@ -87,7 +87,7 @@ class LlmEngine:
                 max_tokens=max_tokens,
                 temperature=0.2,      # low temp for structured correctness
                 top_p=0.95,
-                stop=["\n\n\n", "[INST]", "```"]  # Stop on runaway whitespace, new prompt injection, or markdown fences
+                stop=["\n\n\n", "<|im_end|>", "<|im_start|>", "```"]  # Qwen ChatML stop tokens + runaway guards
             )
             response_text = output["choices"][0]["text"].strip()
             if not response_text:
@@ -123,7 +123,7 @@ class LlmEngine:
                 max_tokens=max_tokens,
                 temperature=0.2,
                 top_p=0.95,
-                stop=["\n\n\n", "[INST]", "```"],
+                stop=["\n\n\n", "<|im_end|>", "<|im_start|>", "```"],
                 stream=True,
             )
             for chunk in stream:
