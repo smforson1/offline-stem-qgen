@@ -3,7 +3,7 @@
 Subject: {subject}
 Difficulty: {difficulty}
 
-Generate 3 short-answer questions based on this textbook text. No multiple choice options.
+Generate {num_questions} short-answer questions based on this textbook text. No multiple choice options.
 
 JSON format:
 {{"questions":[{{"question_text":"...","options":null,"correct_answer":"sample answer text","explanation":"..."}}]}}

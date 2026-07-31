@@ -1,6 +1,6 @@
 // Owner: S3 | Purpose: Shows score, correct answers, and export-to-PDF button
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Share, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -13,7 +13,7 @@ import { Question } from '../types/Question';
 import { Session } from '../types/Session';
 import { QuestionCard } from '../components/QuestionCard';
 import { Colors, Fonts } from '../theme/colors';
-import { Trophy, ThumbsUp, BookOpen, FileText, ClipboardList } from 'lucide-react-native';
+import { Trophy, ThumbsUp, BookOpen, FileText, ClipboardList, ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 type ResultsScreenRouteProp = RouteProp<RootStackParamList, 'Results'>;
 type ResultsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Results'>;
@@ -26,6 +26,8 @@ export const ResultsScreen: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [studentAnswers, setStudentAnswers] = useState<Record<string, { selectedAnswer: string; isCorrect: boolean }>>({});
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => { loadSessionDetails(); }, [sessionId]);
 
@@ -58,6 +60,18 @@ export const ResultsScreen: React.FC = () => {
     ? { label: 'Competent Effort', color: Colors.primary, soft: Colors.primarySoft, icon: ThumbsUp }
     : { label: 'Needs More Practice', color: Colors.error, soft: Colors.errorSoft, icon: BookOpen };
 
+  const goToPrev = () => {
+    const next = Math.max(0, currentIndex - 1);
+    setCurrentIndex(next);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
+  const goToNext = () => {
+    const next = Math.min(questions.length - 1, currentIndex + 1);
+    setCurrentIndex(next);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
@@ -67,7 +81,7 @@ export const ResultsScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Score hero card */}
         <View style={[styles.scoreCard, { borderColor: tier.color + '33', backgroundColor: tier.soft }]}>
           <View style={[styles.scoreBadge, { backgroundColor: tier.color }]}>
@@ -116,11 +130,54 @@ export const ResultsScreen: React.FC = () => {
 
         <Text style={styles.reviewTitle}>Detailed Review</Text>
         <View style={{ paddingBottom: 24 }}>
-          {questions.map((q, idx) => {
-            const qId = q.id || `q_${sessionId}_${idx}`;
+          {questions.length > 0 && (() => {
+            const q = questions[currentIndex];
+            const qId = q.id || `q_${sessionId}_${currentIndex}`;
             const ans = studentAnswers[qId] || { selectedAnswer: '', isCorrect: false };
-            return <QuestionCard key={idx} question={q} questionIndex={idx} totalQuestions={total} selectedAnswer={ans.selectedAnswer} isReviewMode={true} />;
-          })}
+            return (
+              <>
+                <QuestionCard
+                  question={q}
+                  questionIndex={currentIndex}
+                  totalQuestions={questions.length}
+                  selectedAnswer={ans.selectedAnswer}
+                  isReviewMode={true}
+                />
+
+                {/* Prev / Next navigation */}
+                <View style={styles.navRow}>
+                  <TouchableOpacity
+                    onPress={goToPrev}
+                    disabled={currentIndex === 0}
+                    activeOpacity={0.75}
+                    style={[styles.navBtn, currentIndex === 0 && styles.navBtnDisabled]}
+                  >
+                    <ChevronLeft size={18} color={currentIndex === 0 ? Colors.textLight : Colors.primary} />
+                    <Text style={[styles.navBtnText, currentIndex === 0 && styles.navBtnTextDisabled]}>Prev</Text>
+                  </TouchableOpacity>
+
+                  {/* Dot indicators */}
+                  <View style={styles.dotsRow}>
+                    {questions.map((_, i) => (
+                      <TouchableOpacity key={i} onPress={() => { setCurrentIndex(i); scrollRef.current?.scrollTo({ y: 0, animated: true }); }}>
+                        <View style={[styles.dot, i === currentIndex && styles.dotActive]} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={goToNext}
+                    disabled={currentIndex === questions.length - 1}
+                    activeOpacity={0.75}
+                    style={[styles.navBtn, currentIndex === questions.length - 1 && styles.navBtnDisabled]}
+                  >
+                    <Text style={[styles.navBtnText, currentIndex === questions.length - 1 && styles.navBtnTextDisabled]}>Next</Text>
+                    <ChevronRight size={18} color={currentIndex === questions.length - 1 ? Colors.textLight : Colors.primary} />
+                  </TouchableOpacity>
+                </View>
+              </>
+            );
+          })()}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -156,4 +213,12 @@ const styles = StyleSheet.create({
   historyBtnIcon: { fontSize: 16 },
   historyBtnText: { fontSize: 13, fontFamily: Fonts.bold, color: Colors.textPrimary },
   reviewTitle: { fontSize: 16, fontFamily: Fonts.bold, color: Colors.textPrimary, marginBottom: 14 },
+  navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 24 },
+  navBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.card, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10 },
+  navBtnDisabled: { borderColor: Colors.border, backgroundColor: Colors.surface },
+  navBtnText: { fontSize: 13, fontFamily: Fonts.bold, color: Colors.primary },
+  navBtnTextDisabled: { color: Colors.textLight },
+  dotsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1, justifyContent: 'center', paddingHorizontal: 8 },
+  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.border },
+  dotActive: { backgroundColor: Colors.primary, width: 18, borderRadius: 4 },
 });

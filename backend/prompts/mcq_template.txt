@@ -3,7 +3,7 @@
 Subject: {subject}
 Difficulty: {difficulty}
 
-Generate 3 multiple-choice questions based on this textbook text. Each question must have exactly 4 options.
+Generate {num_questions} multiple-choice questions based on this textbook text. Each question must have exactly 4 options.
 
 JSON format:
 {{"questions":[{{"question_text":"...","options":["A","B","C","D"],"correct_answer":"exact option text","explanation":"..."}}]}}

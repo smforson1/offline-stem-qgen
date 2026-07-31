@@ -31,7 +31,7 @@ class PromptBuilder:
         else:
             self.prompts_dir = prompts_dir
 
-    def build_prompt(self, context_text: str, subject: str = "STEM", difficulty: str = "Medium", question_type: str = "mcq") -> str:
+    def build_prompt(self, context_text: str, subject: str = "STEM", difficulty: str = "Medium", question_type: str = "mcq", num_questions: int = 3) -> str:
         """
         Loads the template file for the specified question_type and formats it with variables.
         
@@ -40,6 +40,7 @@ class PromptBuilder:
             subject: e.g., Physics, Chemistry, Biology.
             difficulty: e.g., Easy, Medium, Hard.
             question_type: 'mcq' or 'short_answer'.
+            num_questions: How many questions to ask the model to generate.
             
         Returns:
             The fully compiled prompt string.
@@ -70,7 +71,8 @@ class PromptBuilder:
         compiled_prompt = template.format(
             subject=subject,
             difficulty=difficulty,
-            context=context_text
+            context=context_text,
+            num_questions=num_questions
         )
 
         return compiled_prompt

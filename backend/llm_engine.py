@@ -46,7 +46,7 @@ class LlmEngine:
             from llama_cpp import Llama
             self._model = Llama(
                 model_path=self.model_path,
-                n_ctx=1024,     # Reduced from 2048 — truncated input + short output fits easily
+                n_ctx=2048,     # Enough for 500-word truncated input + up to 10 questions of output
                 n_threads=8,    # Use 8 of the 10 available cores for inference
                 n_batch=512,    # Process more tokens in parallel
                 verbose=False
@@ -59,23 +59,32 @@ class LlmEngine:
             
         return self._model
 
-    def generate_response(self, prompt: str) -> str:
+    def generate_response(self, prompt: str, num_questions: int = 3) -> str:
         """
         Generates a text completion for the provided prompt.
+
+        Args:
+            prompt: The fully compiled prompt string.
+            num_questions: Expected number of questions — used to size max_tokens
+                           so the output is never cut short mid-JSON.
         """
         if self.mock_mode:
             logger.info("Generating dynamic mock STEM questions from context...")
-            return self._generate_mock_questions(prompt)
+            return self._generate_mock_questions(prompt, num_questions=num_questions)
 
         model = self._get_model()
         if self.mock_mode: # check if model loading failed and flagged mock_mode
-            return self._generate_mock_questions(prompt)
+            return self._generate_mock_questions(prompt, num_questions=num_questions)
+
+        # Each MCQ question is roughly 150 tokens of JSON; short-answer ~100.
+        # Use 160 per question as a safe ceiling, with a 100-token base overhead.
+        max_tokens = 100 + (num_questions * 160)
 
         try:
-            logger.info("Running local GGUF inference...")
+            logger.info(f"Running local GGUF inference (num_questions={num_questions}, max_tokens={max_tokens})...")
             output = model(
                 prompt,
-                max_tokens=512,       # 3 JSON questions never exceed ~400 tokens
+                max_tokens=max_tokens,
                 temperature=0.2,      # low temp for structured correctness
                 top_p=0.95,
                 stop=["\n\n\n", "[INST]", "```"]  # Stop on runaway whitespace, new prompt injection, or markdown fences
@@ -83,13 +92,13 @@ class LlmEngine:
             response_text = output["choices"][0]["text"].strip()
             if not response_text:
                 logger.warning("GGUF model returned empty response. Falling back to mock generator.")
-                return self._generate_mock_questions(prompt)
+                return self._generate_mock_questions(prompt, num_questions=num_questions)
             return response_text
         except Exception as e:
             logger.error(f"Error during GGUF model inference: {str(e)}")
             raise RuntimeError(f"LLM inference failed: {str(e)}") from e
 
-    def _generate_mock_questions(self, prompt: str) -> str:
+    def _generate_mock_questions(self, prompt: str, num_questions: int = 3) -> str:
         """
         Generates dynamic mock questions based on the terms found in the prompt context.
         Ensures strict JSON compatibility matching the output schemas.
@@ -129,7 +138,7 @@ class LlmEngine:
         random.seed(abs(hash(context)) % 5000)
         
         questions = []
-        for i in range(3):
+        for i in range(num_questions):
             term1 = keywords[i % len(keywords)]
             term2 = keywords[(i + 1) % len(keywords)]
             term3 = keywords[(i + 2) % len(keywords)]

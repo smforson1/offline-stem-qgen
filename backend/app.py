@@ -174,6 +174,7 @@ def generate():
       "subject": "Physics",           # optional
       "difficulty": "Medium",         # optional
       "question_type": "mcq",         # optional (mcq or short_answer)
+      "num_questions": 5,             # optional, how many questions to generate (default 3)
       "session_id": "optional_id"     # optional, auto-generated if missing
     }
     """
@@ -191,6 +192,7 @@ def generate():
     subject = data.get("subject", "STEM")
     difficulty = data.get("difficulty", "Medium")
     question_type = data.get("question_type", "mcq")
+    num_questions = int(data.get("num_questions", 3))  # default 3, caller can request more
     
     # Resolve or create session ID
     session_id = data.get("session_id")
@@ -204,12 +206,13 @@ def generate():
             context_text=context_text,
             subject=subject,
             difficulty=difficulty,
-            question_type=question_type
+            question_type=question_type,
+            num_questions=num_questions
         )
         
         # 2. Query LlmEngine
         llm = get_llm_engine()
-        raw_response = llm.generate_response(prompt)
+        raw_response = llm.generate_response(prompt, num_questions=num_questions)
         
         # 3. Validate and Parse response JSON
         questions = Validator.validate_and_parse_response(
