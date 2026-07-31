@@ -8,7 +8,7 @@
     "@react-navigation/native": "^7.3.1",
     "@react-navigation/stack": "^7.10.3",
     "axios": "^1.17.0",
-    "expo": "~56.0.17",
+    "expo": "~56.0.18",
     "expo-build-properties": "~56.0.24",
     "expo-status-bar": "~56.0.4",
     "nativewind": "^4.2.5",
