@@ -35,7 +35,7 @@ export const OnboardingScreen: React.FC = () => {
           Master STEM,{'\n'}Completely <Text style={styles.accentText}>Offline</Text>.
         </Text>
         <Text style={styles.subtitle}>
-          Scan your textbook and let our local AI generate custom quizzes on your Raspberry Pi edge node. No internet required.
+          Scan your textbook and let our local AI generate custom quizzes on your local edge backend. No internet required.
         </Text>
 
         <View style={styles.features}>

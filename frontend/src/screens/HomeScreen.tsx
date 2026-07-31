@@ -122,7 +122,7 @@ export const HomeScreen: React.FC = () => {
           </View>
         </TouchableOpacity>
 
-        <Text style={styles.footer}>Offline AI · Raspberry Pi Edge Node</Text>
+        <Text style={styles.footer}>Offline AI · Local Edge Backend</Text>
       </ScrollView>
     </SafeAreaView>
   );

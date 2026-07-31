@@ -72,8 +72,8 @@ export const SettingsScreen: React.FC = () => {
               <Link2 size={20} color={Colors.primary} />
             </View>
             <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.cardTitle}>Local Gateway IP</Text>
-              <Text style={styles.cardSubtitle}>Raspberry Pi LAN address</Text>
+              <Text style={styles.cardTitle}>Local Backend URL</Text>
+              <Text style={styles.cardSubtitle}>Your computer's IP address</Text>
             </View>
           </View>
           <TextInput

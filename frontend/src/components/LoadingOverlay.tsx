@@ -28,7 +28,7 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
           <Text style={styles.title}>Please Wait</Text>
           <Text style={styles.message}>{stepMessage}</Text>
           <View style={styles.hint}>
-            <Text style={styles.hintText}>Processing on Raspberry Pi edge node</Text>
+            <Text style={styles.hintText}>Processing on local backend node</Text>
           </View>
         </View>
       </View>
