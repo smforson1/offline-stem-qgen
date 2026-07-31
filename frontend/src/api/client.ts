@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useSettingsStore } from '../store/useSettingsStore';
 
 const apiClient = axios.create({
-  timeout: 90000, // 90 seconds timeout to accommodate slow CPU OCR/LLM generation on the Pi
+  timeout: 300000, // 5 minutes timeout to accommodate slow CPU OCR/LLM generation
   headers: {
     'Content-Type': 'application/json',
   },
