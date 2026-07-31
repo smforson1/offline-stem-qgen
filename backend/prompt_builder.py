@@ -6,9 +6,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Maximum words of OCR context to feed into the LLM.
-# A full textbook page can be 1500+ words; the model only needs ~500 to
-# generate 3 solid questions, and feeding more just burns inference time.
-_MAX_CONTEXT_WORDS = 500
+# Kept at 350 words (~470 tokens) to leave enough context budget for
+# up to 10 questions of JSON output within the 4096 token window.
+_MAX_CONTEXT_WORDS = 350
 
 
 def _truncate_context(text: str, max_words: int = _MAX_CONTEXT_WORDS) -> str:

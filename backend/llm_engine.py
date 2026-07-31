@@ -46,7 +46,7 @@ class LlmEngine:
             from llama_cpp import Llama
             self._model = Llama(
                 model_path=self.model_path,
-                n_ctx=2048,     # Enough for 500-word truncated input + up to 10 questions of output
+                n_ctx=4096,     # Large enough for truncated input + 10 questions of output
                 n_threads=8,    # Use 8 of the 10 available cores for inference
                 n_batch=512,    # Process more tokens in parallel
                 verbose=False
@@ -76,9 +76,9 @@ class LlmEngine:
         if self.mock_mode: # check if model loading failed and flagged mock_mode
             return self._generate_mock_questions(prompt, num_questions=num_questions)
 
-        # Each MCQ question is roughly 150 tokens of JSON; short-answer ~100.
-        # Use 160 per question as a safe ceiling, with a 100-token base overhead.
-        max_tokens = 100 + (num_questions * 160)
+        # Each MCQ question is roughly 180 tokens of JSON; short-answer ~120.
+        # Use 200 per question as a safe ceiling, with a 150-token base overhead.
+        max_tokens = 150 + (num_questions * 200)
 
         try:
             logger.info(f"Running local GGUF inference (num_questions={num_questions}, max_tokens={max_tokens})...")
@@ -87,7 +87,9 @@ class LlmEngine:
                 max_tokens=max_tokens,
                 temperature=0.2,      # low temp for structured correctness
                 top_p=0.95,
-                stop=["\n\n\n", "<|im_end|>", "<|im_start|>", "```"]  # Qwen ChatML stop tokens + runaway guards
+                # Stop on Qwen's turn-end tokens and runaway whitespace.
+                # Do NOT include ``` — validator handles markdown fences.
+                stop=["<|im_end|>", "<|im_start|>", "\n\n\n\n"],
             )
             response_text = output["choices"][0]["text"].strip()
             if not response_text:
@@ -123,7 +125,11 @@ class LlmEngine:
                 max_tokens=max_tokens,
                 temperature=0.2,
                 top_p=0.95,
-                stop=["\n\n\n", "<|im_end|>", "<|im_start|>", "```"],
+                # Stop on Qwen's turn-end tokens and runaway whitespace.
+                # Do NOT include ``` here — if the model wraps JSON in a code
+                # fence the validator's markdown-unwrap step handles it; stopping
+                # on ``` would cut the output before the JSON even starts.
+                stop=["<|im_end|>", "<|im_start|>", "\n\n\n\n"],
                 stream=True,
             )
             for chunk in stream:

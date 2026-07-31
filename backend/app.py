@@ -343,6 +343,7 @@ def generate_stream():
                     })
 
             # Full response collected — parse and validate
+            logger.info(f"Streaming complete. Accumulated {len(accumulated)} chars. Preview: {accumulated[:200]!r}")
             questions = Validator.validate_and_parse_response(
                 raw_llm_text=accumulated,
                 question_type=question_type,

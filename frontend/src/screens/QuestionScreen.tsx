@@ -55,9 +55,13 @@ export const QuestionScreen: React.FC = () => {
     let correctCount = 0;
     const answersToSave = sessionStore.questions.map((q, idx) => {
       const studentAns = sessionStore.userAnswers[idx] || '';
-      const isCorrect = studentAns.trim().toLowerCase() === q.correct_answer.trim().toLowerCase();
+      // Normalise both sides: trim whitespace and collapse internal spaces
+      const normalise = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+      const isCorrect = normalise(studentAns) === normalise(q.correct_answer);
       if (isCorrect) correctCount++;
-      return { questionId: q.id || `q_${sessionId}_${idx}`, selectedAnswer: studentAns, isCorrect };
+      // Use the question's DB id if available, otherwise fall back to the generated key
+      const questionId = q.id || `q_${sessionId}_${idx}`;
+      return { questionId, selectedAnswer: studentAns, isCorrect };
     });
     try {
       await questionRepository.saveStudentAnswers(answersToSave, sessionId);

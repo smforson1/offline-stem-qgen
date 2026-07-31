@@ -21,7 +21,7 @@ class Validator:
         text = raw_text.strip()
 
         # If the model wrapped output in a markdown code fence, unwrap it first
-        fence_match = re.search(r'```(?:json)?\s*(\{.*?)\s*```', text, re.DOTALL)
+        fence_match = re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', text)
         if fence_match:
             text = fence_match.group(1).strip()
 

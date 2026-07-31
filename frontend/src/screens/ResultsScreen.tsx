@@ -21,7 +21,7 @@ type ResultsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Resu
 export const ResultsScreen: React.FC = () => {
   const navigation = useNavigation<ResultsScreenNavigationProp>();
   const route = useRoute<ResultsScreenRouteProp>();
-  const { sessionId, score, total } = route.params;
+  const { sessionId } = route.params;
   const [session, setSession] = useState<Session | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [studentAnswers, setStudentAnswers] = useState<Record<string, { selectedAnswer: string; isCorrect: boolean }>>({});
@@ -36,9 +36,19 @@ export const ResultsScreen: React.FC = () => {
       const sess = await sessionRepository.getSessionById(sessionId);
       const qList = await questionRepository.getQuestionsBySession(sessionId);
       const ansList = await questionRepository.getStudentAnswersBySession(sessionId);
-      setSession(sess); setQuestions(qList); setStudentAnswers(ansList);
+      setSession(sess);
+      setQuestions(qList);
+      setStudentAnswers(ansList);
     } catch (e) { console.error('Failed to load results:', e); }
   };
+
+  // Derive score and total from loaded data so History and fresh results
+  // both show consistent numbers regardless of what nav params say.
+  const total = questions.length;
+  const score = questions.reduce((acc, q, idx) => {
+    const ans = studentAnswers[q.id!] || studentAnswers[`q_${sessionId}_${idx}`];
+    return acc + (ans?.isCorrect ? 1 : 0);
+  }, 0);
 
   const handleExportPdf = async () => {
     if (pdfLoading) return;
@@ -132,8 +142,10 @@ export const ResultsScreen: React.FC = () => {
         <View style={{ paddingBottom: 24 }}>
           {questions.length > 0 && (() => {
             const q = questions[currentIndex];
-            const qId = q.id || `q_${sessionId}_${currentIndex}`;
-            const ans = studentAnswers[qId] || { selectedAnswer: '', isCorrect: false };
+            // Look up by real DB id first, then by generated fallback key
+            const ans = studentAnswers[q.id!]
+              || studentAnswers[`q_${sessionId}_${currentIndex}`]
+              || { selectedAnswer: '', isCorrect: false };
             return (
               <>
                 <QuestionCard

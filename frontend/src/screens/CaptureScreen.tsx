@@ -8,6 +8,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import {
   Camera, CameraRef, useCameraDevice, useCameraPermission, usePhotoOutput,
 } from 'react-native-vision-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { RootStackParamList } from '../types/Navigation';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useSessionStore } from '../store/useSessionStore';
@@ -17,7 +18,7 @@ import { sessionRepository } from '../db/sessionRepository';
 import { questionRepository } from '../db/questionRepository';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import { Colors, Fonts } from '../theme/colors';
-import { CameraOff, Lock, Ban } from 'lucide-react-native';
+import { CameraOff, Lock, Ban, Image as ImageIcon } from 'lucide-react-native';
 
 type CaptureScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Capture'>;
 
@@ -126,6 +127,32 @@ export const CaptureScreen: React.FC = () => {
     );
   };
 
+  const handlePickFromGallery = async () => {
+    // Request media library permission
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      alert('Gallery access was denied. Please enable it in your device settings.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.9,
+      allowsEditing: false,
+    });
+    if (result.canceled || !result.assets || result.assets.length === 0) return;
+    const uri = result.assets[0].uri;
+    try {
+      setLoading(true);
+      setLoadingStep('Running OCR on the image...');
+      const ocrRes = await uploadImageForOcr(uri);
+      if (!ocrRes.success || !ocrRes.full_text) throw new Error(ocrRes.error || 'Failed to extract text.');
+      await processTextbookText(ocrRes.full_text);
+    } catch (e: any) {
+      setLoading(false);
+      alert(`Upload failed: ${e.message}`);
+    }
+  };
+
   // ── No camera device ──────────────────────────────────────────────────────
   if (!device) {
     return (
@@ -148,6 +175,10 @@ export const CaptureScreen: React.FC = () => {
             </Text>
             <TouchableOpacity onPress={handleMockCapture} activeOpacity={0.85} style={styles.primaryBtn}>
               <Text style={styles.primaryBtnText}>Simulate Textbook Scan</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handlePickFromGallery} activeOpacity={0.85} style={styles.secondaryBtn}>
+              <ImageIcon size={16} color={Colors.primary} style={{ marginRight: 6 }} />
+              <Text style={styles.secondaryBtnText}>Upload from Gallery</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.75} style={styles.ghostBtn}>
               <Text style={styles.ghostBtnText}>Cancel</Text>
@@ -195,6 +226,10 @@ export const CaptureScreen: React.FC = () => {
             <TouchableOpacity onPress={handleMockCapture} activeOpacity={0.75} style={styles.secondaryBtn}>
               <Text style={styles.secondaryBtnText}>Continue with Mock Scan</Text>
             </TouchableOpacity>
+            <TouchableOpacity onPress={handlePickFromGallery} activeOpacity={0.75} style={styles.secondaryBtn}>
+              <ImageIcon size={16} color={Colors.primary} style={{ marginRight: 6 }} />
+              <Text style={styles.secondaryBtnText}>Upload from Gallery</Text>
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.ghostBtn}>
               <Text style={styles.ghostBtnText}>Cancel</Text>
             </TouchableOpacity>
@@ -237,7 +272,10 @@ export const CaptureScreen: React.FC = () => {
           <TouchableOpacity onPress={handleCapture} disabled={loading} activeOpacity={0.85} style={styles.shutter}>
             <View style={styles.shutterInner} />
           </TouchableOpacity>
-          <View style={{ width: 72 }} />
+          <TouchableOpacity onPress={handlePickFromGallery} style={styles.galleryBtn}>
+            <ImageIcon size={22} color="#fff" />
+            <Text style={styles.galleryBtnText}>Gallery</Text>
+          </TouchableOpacity>
         </View>
       </View>
       <LoadingOverlay visible={loading} stepMessage={loadingStep} />
@@ -288,6 +326,8 @@ const styles = StyleSheet.create({
   hudBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 24, paddingVertical: 28, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 10 },
   simulateBtn: { paddingVertical: 8, paddingHorizontal: 16, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   simulateBtnText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontFamily: Fonts.semiBold },
+  galleryBtn: { alignItems: 'center', justifyContent: 'center', width: 72, gap: 4 },
+  galleryBtnText: { color: 'rgba(255,255,255,0.85)', fontSize: 10, fontFamily: Fonts.semiBold },
   shutter: { width: 76, height: 76, borderRadius: 38, backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 3, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   shutterInner: { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary },
 });

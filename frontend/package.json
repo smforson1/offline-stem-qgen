@@ -10,6 +10,7 @@
     "axios": "^1.17.0",
     "expo": "~56.0.18",
     "expo-build-properties": "~56.0.24",
+    "expo-image-picker": "~56.0.22",
     "expo-status-bar": "~56.0.4",
     "lucide-react-native": "^1.28.0",
     "nativewind": "^4.2.5",
