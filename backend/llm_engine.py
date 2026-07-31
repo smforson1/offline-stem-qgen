@@ -74,11 +74,15 @@ class LlmEngine:
             logger.info("Running local GGUF inference...")
             output = model(
                 prompt,
-                max_tokens=1024,
+                max_tokens=2048,
                 temperature=0.2, # low temp for structured correctness
-                top_p=0.95
+                top_p=0.95,
+                stop=["\n\n\n"] # Stop at excessive whitespace to prevent runaway generation
             )
-            response_text = output["choices"][0]["text"]
+            response_text = output["choices"][0]["text"].strip()
+            if not response_text:
+                logger.warning("GGUF model returned empty response. Falling back to mock generator.")
+                return self._generate_mock_questions(prompt)
             return response_text
         except Exception as e:
             logger.error(f"Error during GGUF model inference: {str(e)}")
