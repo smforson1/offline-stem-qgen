@@ -1,9 +1,10 @@
 // Owner: S3 | Purpose: Reusable card — renders a single question with answer options
 
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
 import { Question } from '../types/Question';
 import { Colors, Fonts } from '../theme/colors';
+import { ChevronDown, ChevronUp } from 'lucide-react-native';
 
 interface QuestionCardProps {
   question: Question;
@@ -21,6 +22,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   selectedAnswer = '', onSelectAnswer, isReviewMode = false,
 }) => {
   const isMcq = question.options && question.options.length > 0;
+  const [explanationOpen, setExplanationOpen] = useState(false);
 
   return (
     <View style={styles.card}>
@@ -135,16 +137,25 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         </View>
       )}
 
-      {/* Explanation */}
+      {/* Explanation — collapsible in review mode */}
       {isReviewMode && question.explanation && (
         <View style={styles.explanationBox}>
-          <View style={styles.explanationHeader}>
+          <TouchableOpacity
+            onPress={() => setExplanationOpen((o) => !o)}
+            activeOpacity={0.75}
+            style={styles.explanationHeader}
+          >
             <View style={styles.explanationIconWrap}>
               <Text style={{ fontSize: 14 }}>💡</Text>
             </View>
             <Text style={styles.explanationTitle}>Explanation</Text>
-          </View>
-          <Text style={styles.explanationText}>{question.explanation}</Text>
+            {explanationOpen
+              ? <ChevronUp size={16} color={Colors.primary} style={{ marginLeft: 'auto' }} />
+              : <ChevronDown size={16} color={Colors.primary} style={{ marginLeft: 'auto' }} />}
+          </TouchableOpacity>
+          {explanationOpen && (
+            <Text style={styles.explanationText}>{question.explanation}</Text>
+          )}
         </View>
       )}
     </View>
@@ -225,8 +236,8 @@ const styles = StyleSheet.create({
   correctAnswerText: { fontSize: 13, fontFamily: Fonts.semiBold, color: Colors.textPrimary, lineHeight: 19 },
 
   explanationBox: { marginTop: 16, backgroundColor: Colors.primarySoft, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: Colors.border },
-  explanationHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  explanationHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   explanationIconWrap: { width: 28, height: 28, borderRadius: 8, backgroundColor: Colors.card, alignItems: 'center', justifyContent: 'center' },
   explanationTitle: { fontSize: 12, fontFamily: Fonts.bold, color: Colors.primary, textTransform: 'uppercase', letterSpacing: 0.5 },
-  explanationText: { fontSize: 13, fontFamily: Fonts.regular, color: Colors.textPrimary, lineHeight: 20 },
+  explanationText: { fontSize: 13, fontFamily: Fonts.regular, color: Colors.textPrimary, lineHeight: 20, marginTop: 10 },
 });

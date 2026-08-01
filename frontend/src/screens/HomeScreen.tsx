@@ -29,6 +29,7 @@ export const HomeScreen: React.FC = () => {
   const [sessionCount, setSessionCount] = useState(0);
   const [avgScore, setAvgScore] = useState<number | null>(null);
   const [bestScore, setBestScore] = useState<number | null>(null);
+  const [topSubject, setTopSubject] = useState<string | null>(null);
 
   useEffect(() => { if (isFocused) loadStats(); }, [isFocused]);
 
@@ -42,6 +43,16 @@ export const HomeScreen: React.FC = () => {
         setAvgScore(Math.round(sum / graded.length));
         setBestScore(Math.round(Math.max(...graded.map((s) => s.average_score || 0))));
       } else { setAvgScore(null); setBestScore(null); }
+
+      // Most-practised subject
+      if (history.length > 0) {
+        const freq: Record<string, number> = {};
+        history.forEach((s) => { freq[s.subject] = (freq[s.subject] || 0) + 1; });
+        const top = Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];
+        setTopSubject(top);
+      } else {
+        setTopSubject(null);
+      }
     } catch (e) { console.error('Failed to load stats:', e); }
   };
 
@@ -85,8 +96,8 @@ export const HomeScreen: React.FC = () => {
             </View>
             <View style={styles.heroStatDivider} />
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>{sessionCount}</Text>
-              <Text style={styles.heroStatLabel}>Quizzes</Text>
+              <Text style={styles.heroStatValue} numberOfLines={1}>{topSubject ?? '—'}</Text>
+              <Text style={styles.heroStatLabel}>Top Subject</Text>
             </View>
           </View>
         </View>

@@ -9,11 +9,13 @@ import { RootStackParamList } from '../types/Navigation';
 import { questionRepository } from '../db/questionRepository';
 import { sessionRepository } from '../db/sessionRepository';
 import { downloadPdfExport } from '../api/exportApi';
+import { generateQuestionsStream } from '../api/generateApi';
 import { Question } from '../types/Question';
 import { Session } from '../types/Session';
 import { QuestionCard } from '../components/QuestionCard';
 import { Colors, Fonts } from '../theme/colors';
-import { Trophy, ThumbsUp, BookOpen, FileText, ClipboardList, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { Trophy, ThumbsUp, BookOpen, FileText, ClipboardList, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react-native';
+import { useSettingsStore } from '../store/useSettingsStore';
 
 type ResultsScreenRouteProp = RouteProp<RootStackParamList, 'Results'>;
 type ResultsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Results'>;
@@ -26,8 +28,11 @@ export const ResultsScreen: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [studentAnswers, setStudentAnswers] = useState<Record<string, { selectedAnswer: string; isCorrect: boolean }>>({});
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [regenLoading, setRegenLoading] = useState(false);
+  const [regenStep, setRegenStep] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
+  const settings = useSettingsStore();
 
   useEffect(() => { loadSessionDetails(); }, [sessionId]);
 
@@ -49,6 +54,43 @@ export const ResultsScreen: React.FC = () => {
     const ans = studentAnswers[q.id!] || studentAnswers[`q_${sessionId}_${idx}`];
     return acc + (ans?.isCorrect ? 1 : 0);
   }, 0);
+
+  const handleRegenerate = async () => {
+    if (!session?.raw_context || regenLoading) return;
+    setRegenLoading(true);
+    setRegenStep('Generating new questions...');
+    setCurrentIndex(0);
+    await generateQuestionsStream(
+      session.raw_context,
+      session.subject,
+      session.difficulty,
+      settings.defaultQuestionType,
+      settings.defaultQuestionCount ?? 5,
+      ({ question_index, total }) => setRegenStep(`Got question ${question_index} of ${total}...`),
+      async ({ session_id, questions: newQs }) => {
+        try {
+          const { sessionRepository: sRepo } = await import('../db/sessionRepository');
+          const { questionRepository: qRepo } = await import('../db/questionRepository');
+          const newSession = {
+            id: session_id,
+            subject: session.subject,
+            difficulty: session.difficulty,
+            raw_context: session.raw_context,
+            created_at: new Date().toISOString(),
+          };
+          await sRepo.saveSession(newSession);
+          await qRepo.saveQuestions(newQs, session_id);
+          setRegenLoading(false);
+          // Navigate to the new session's results directly
+          navigation.replace('Results', { sessionId: session_id, score: 0, total: newQs.length });
+        } catch (e: any) {
+          setRegenLoading(false);
+          alert(`Failed to save regenerated session: ${e.message}`);
+        }
+      },
+      (err) => { setRegenLoading(false); alert(`Regeneration failed: ${err}`); },
+    );
+  };
 
   const handleExportPdf = async () => {
     if (pdfLoading) return;
@@ -138,6 +180,19 @@ export const ResultsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
+        {/* Regenerate button */}
+        <TouchableOpacity
+          onPress={handleRegenerate}
+          disabled={regenLoading || !session?.raw_context}
+          activeOpacity={0.85}
+          style={[styles.regenBtn, (regenLoading || !session?.raw_context) && { opacity: 0.5 }]}
+        >
+          {regenLoading
+            ? <ActivityIndicator size="small" color={Colors.primary} style={{ marginRight: 8 }} />
+            : <RefreshCw size={16} color={Colors.primary} style={{ marginRight: 6 }} />}
+          <Text style={styles.regenBtnText}>{regenLoading ? regenStep : 'Regenerate Questions'}</Text>
+        </TouchableOpacity>
+
         <Text style={styles.reviewTitle}>Detailed Review</Text>
         <View style={{ paddingBottom: 24 }}>
           {questions.length > 0 && (() => {
@@ -225,6 +280,8 @@ const styles = StyleSheet.create({
   historyBtnIcon: { fontSize: 16 },
   historyBtnText: { fontSize: 13, fontFamily: Fonts.bold, color: Colors.textPrimary },
   reviewTitle: { fontSize: 16, fontFamily: Fonts.bold, color: Colors.textPrimary, marginBottom: 14 },
+  regenBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primarySoft, borderRadius: 14, paddingVertical: 13, marginBottom: 24, borderWidth: 1.5, borderColor: Colors.primary },
+  regenBtnText: { fontSize: 13, fontFamily: Fonts.bold, color: Colors.primary },
   navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 24 },
   navBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.card, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10 },
   navBtnDisabled: { borderColor: Colors.border, backgroundColor: Colors.surface },

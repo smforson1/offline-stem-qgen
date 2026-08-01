@@ -86,6 +86,48 @@ def get_db_connection():
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
+def auto_detect_difficulty(text: str) -> str:
+    """
+    Infers question difficulty from OCR text vocabulary complexity.
+
+    Heuristic:
+    - Average word length > 7 chars  → Hard  (dense technical language)
+    - Average word length 5-7 chars  → Medium
+    - Average word length < 5 chars  → Easy
+
+    This is a lightweight proxy for domain-term density that requires no
+    extra dependencies and runs in microseconds.
+    """
+    words = [w for w in text.split() if w.isalpha()]
+    if not words:
+        return "Medium"
+    avg_len = sum(len(w) for w in words) / len(words)
+    if avg_len > 7:
+        return "Hard"
+    elif avg_len >= 5:
+        return "Medium"
+    else:
+        return "Easy"
+
+def generate_with_retry(llm, prompt: str, question_type: str, num_questions: int, max_retries: int = 2) -> list:
+    """
+    Calls the LLM and validates the response. Retries up to max_retries times
+    with slightly increased temperature on each attempt to break out of a bad
+    generation pattern. Returns a validated question list or raises on final failure.
+    """
+    import json
+    last_error = None
+    for attempt in range(max_retries + 1):
+        try:
+            # Nudge temperature up slightly on retries to get different output
+            temperature_bump = attempt * 0.1
+            raw = llm.generate_response(prompt, num_questions=num_questions, temperature_bump=temperature_bump)
+            return Validator.validate_and_parse_response(raw_llm_text=raw, question_type=question_type)
+        except (ValueError, RuntimeError) as e:
+            last_error = e
+            logger.warning(f"Generation attempt {attempt + 1} failed: {e}. {'Retrying...' if attempt < max_retries else 'Giving up.'}")
+    raise last_error
+
 @app.after_request
 def add_cors_headers(response):
     """Ensure CORS is handled properly for local network API requests."""
@@ -193,7 +235,12 @@ def generate():
     difficulty = data.get("difficulty", "Medium")
     question_type = data.get("question_type", "mcq")
     num_questions = int(data.get("num_questions", 3))  # default 3, caller can request more
-    
+
+    # Auto-detect difficulty if the caller sent "Auto" or omitted it
+    if difficulty == "Auto" or not difficulty:
+        difficulty = auto_detect_difficulty(context_text)
+        logger.info(f"Auto-detected difficulty: {difficulty}")
+
     # Resolve or create session ID
     session_id = data.get("session_id")
     if not session_id:
@@ -209,16 +256,10 @@ def generate():
             question_type=question_type,
             num_questions=num_questions
         )
-        
-        # 2. Query LlmEngine
+
+        # 2. Query LlmEngine with automatic retry on bad JSON
         llm = get_llm_engine()
-        raw_response = llm.generate_response(prompt, num_questions=num_questions)
-        
-        # 3. Validate and Parse response JSON
-        questions = Validator.validate_and_parse_response(
-            raw_llm_text=raw_response,
-            question_type=question_type
-        )
+        questions = generate_with_retry(llm, prompt, question_type, num_questions)
         
         # 4. Insert into SQLite Database
         conn = get_db_connection()
@@ -302,6 +343,11 @@ def generate_stream():
     question_type = data.get("question_type", "mcq")
     num_questions = int(data.get("num_questions", 3))
 
+    # Auto-detect difficulty if caller sends "Auto" or omits it
+    if difficulty == "Auto" or not difficulty:
+        difficulty = auto_detect_difficulty(context_text)
+        logger.info(f"Stream: auto-detected difficulty: {difficulty}")
+
     session_id = data.get("session_id")
     if not session_id:
         session_id = f"sess_{uuid.uuid4().hex[:12]}"
@@ -342,12 +388,27 @@ def generate_stream():
                         "total": num_questions,
                     })
 
-            # Full response collected — parse and validate
+            # Full response collected — parse and validate with retry
             logger.info(f"Streaming complete. Accumulated {len(accumulated)} chars. Preview: {accumulated[:200]!r}")
-            questions = Validator.validate_and_parse_response(
-                raw_llm_text=accumulated,
-                question_type=question_type,
-            )
+            last_err = None
+            questions = None
+            for attempt in range(3):
+                try:
+                    questions = Validator.validate_and_parse_response(
+                        raw_llm_text=accumulated,
+                        question_type=question_type,
+                    )
+                    break
+                except (ValueError, RuntimeError) as e:
+                    last_err = e
+                    logger.warning(f"Stream validation attempt {attempt+1} failed: {e}")
+                    if attempt < 2:
+                        # Re-run inference with higher temperature
+                        accumulated = ""
+                        for token in llm.generate_response_stream(prompt, num_questions=num_questions, temperature_bump=(attempt+1)*0.1):
+                            accumulated += token
+            if questions is None:
+                raise last_err
 
             # Persist to SQLite
             conn = get_db_connection()

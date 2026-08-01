@@ -1,7 +1,7 @@
 // Owner: S3 | Purpose: VisionCamera screen — captures textbook photo and triggers OCR pipeline
 
 import React, { useRef, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Linking, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Linking, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -16,9 +16,10 @@ import { uploadImageForOcr } from '../api/ocrApi';
 import { generateQuestionsStream } from '../api/generateApi';
 import { sessionRepository } from '../db/sessionRepository';
 import { questionRepository } from '../db/questionRepository';
+import { ocrCacheRepository } from '../db/ocrCacheRepository';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import { Colors, Fonts } from '../theme/colors';
-import { CameraOff, Lock, Ban, Image as ImageIcon } from 'lucide-react-native';
+import { CameraOff, Lock, Ban, Image as ImageIcon, Clock } from 'lucide-react-native';
 
 type CaptureScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Capture'>;
 
@@ -39,9 +40,14 @@ export const CaptureScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState('');
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [recentScans, setRecentScans] = useState<import('../db/ocrCacheRepository').OcrCacheEntry[]>([]);
+  const [showRecent, setShowRecent] = useState(false);
 
   useFocusEffect(
-    useCallback(() => { setPermissionDenied(false); }, [])
+    useCallback(() => {
+      setPermissionDenied(false);
+      ocrCacheRepository.getAll().then(setRecentScans).catch(() => {});
+    }, [])
   );
 
   const handleRequestPermission = async () => {
@@ -114,6 +120,14 @@ export const CaptureScreen: React.FC = () => {
       setLoadingStep('Running OCR on the page...');
       const ocrRes = await uploadImageForOcr(`file://${tempPath}`);
       if (!ocrRes.success || !ocrRes.full_text) throw new Error(ocrRes.error || 'Failed to extract text.');
+      // Cache OCR result for offline regeneration
+      await ocrCacheRepository.save({
+        id: String(Math.abs(tempPath.split('').reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0))),
+        uri_hint: tempPath.slice(-40),
+        full_text: ocrRes.full_text,
+        subject: settings.defaultSubject,
+        cached_at: new Date().toISOString(),
+      });
       await processTextbookText(ocrRes.full_text);
     } catch (e: any) {
       setLoading(false);
@@ -146,12 +160,55 @@ export const CaptureScreen: React.FC = () => {
       setLoadingStep('Running OCR on the image...');
       const ocrRes = await uploadImageForOcr(uri);
       if (!ocrRes.success || !ocrRes.full_text) throw new Error(ocrRes.error || 'Failed to extract text.');
+      // Cache OCR result for offline regeneration
+      await ocrCacheRepository.save({
+        id: String(Math.abs(uri.split('').reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0))),
+        uri_hint: uri.slice(-40),
+        full_text: ocrRes.full_text,
+        subject: settings.defaultSubject,
+        cached_at: new Date().toISOString(),
+      });
       await processTextbookText(ocrRes.full_text);
     } catch (e: any) {
       setLoading(false);
       alert(`Upload failed: ${e.message}`);
     }
   };
+
+  // Reusable "Recent Scans" panel — shown when the user taps the Recent button
+  const RecentScansPanel = () => (
+    <View style={styles.recentPanel}>
+      <View style={styles.recentHeader}>
+        <Clock size={14} color={Colors.primary} />
+        <Text style={styles.recentTitle}>Recent Scans</Text>
+        <TouchableOpacity onPress={() => setShowRecent(false)} style={{ marginLeft: 'auto' }}>
+          <Text style={styles.recentClose}>✕</Text>
+        </TouchableOpacity>
+      </View>
+      {recentScans.length === 0 ? (
+        <Text style={styles.recentEmpty}>No cached scans yet.</Text>
+      ) : (
+        <ScrollView style={{ maxHeight: 220 }} showsVerticalScrollIndicator={false}>
+          {recentScans.map((entry) => (
+            <TouchableOpacity
+              key={entry.id}
+              style={styles.recentItem}
+              activeOpacity={0.75}
+              onPress={() => { setShowRecent(false); processTextbookText(entry.full_text); }}
+            >
+              <View style={styles.recentItemBody}>
+                <Text style={styles.recentItemSubject}>{entry.subject}</Text>
+                <Text style={styles.recentItemText} numberOfLines={2}>{entry.full_text}</Text>
+                <Text style={styles.recentItemDate}>
+                  {new Date(entry.cached_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+    </View>
+  );
 
   // ── No camera device ──────────────────────────────────────────────────────
   if (!device) {
@@ -180,6 +237,13 @@ export const CaptureScreen: React.FC = () => {
               <ImageIcon size={16} color={Colors.primary} style={{ marginRight: 6 }} />
               <Text style={styles.secondaryBtnText}>Upload from Gallery</Text>
             </TouchableOpacity>
+            {recentScans.length > 0 && (
+              <TouchableOpacity onPress={() => setShowRecent((v) => !v)} activeOpacity={0.75} style={styles.ghostBtn}>
+                <Clock size={14} color={Colors.textMuted} style={{ marginRight: 6 }} />
+                <Text style={styles.ghostBtnText}>Recent Scans ({recentScans.length})</Text>
+              </TouchableOpacity>
+            )}
+            {showRecent && <RecentScansPanel />}
             <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.75} style={styles.ghostBtn}>
               <Text style={styles.ghostBtnText}>Cancel</Text>
             </TouchableOpacity>
@@ -277,6 +341,20 @@ export const CaptureScreen: React.FC = () => {
             <Text style={styles.galleryBtnText}>Gallery</Text>
           </TouchableOpacity>
         </View>
+        {showRecent && (
+          <View style={{ position: 'absolute', bottom: 110, left: 16, right: 16, zIndex: 20 }}>
+            <RecentScansPanel />
+          </View>
+        )}
+        {recentScans.length > 0 && !showRecent && (
+          <TouchableOpacity
+            onPress={() => setShowRecent(true)}
+            style={styles.recentHudBtn}
+          >
+            <Clock size={12} color="rgba(255,255,255,0.85)" />
+            <Text style={styles.recentHudBtnText}>Recent ({recentScans.length})</Text>
+          </TouchableOpacity>
+        )}
       </View>
       <LoadingOverlay visible={loading} stepMessage={loadingStep} />
     </SafeAreaView>
@@ -330,4 +408,16 @@ const styles = StyleSheet.create({
   galleryBtnText: { color: 'rgba(255,255,255,0.85)', fontSize: 10, fontFamily: Fonts.semiBold },
   shutter: { width: 76, height: 76, borderRadius: 38, backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 3, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   shutterInner: { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary },
+  recentHudBtn: { position: 'absolute', bottom: 106, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6, zIndex: 10 },
+  recentHudBtnText: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontFamily: Fonts.semiBold },
+  recentPanel: { backgroundColor: Colors.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: Colors.border, shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12, elevation: 6, marginTop: 12 },
+  recentHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  recentTitle: { fontSize: 13, fontFamily: Fonts.bold, color: Colors.textPrimary },
+  recentClose: { fontSize: 14, color: Colors.textMuted, paddingHorizontal: 4 },
+  recentEmpty: { fontSize: 12, fontFamily: Fonts.regular, color: Colors.textMuted, textAlign: 'center', paddingVertical: 8 },
+  recentItem: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  recentItemBody: { gap: 2 },
+  recentItemSubject: { fontSize: 10, fontFamily: Fonts.bold, color: Colors.primary, textTransform: 'uppercase', letterSpacing: 0.3 },
+  recentItemText: { fontSize: 12, fontFamily: Fonts.medium, color: Colors.textPrimary, lineHeight: 18 },
+  recentItemDate: { fontSize: 10, fontFamily: Fonts.regular, color: Colors.textLight },
 });

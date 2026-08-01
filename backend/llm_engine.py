@@ -59,36 +59,34 @@ class LlmEngine:
             
         return self._model
 
-    def generate_response(self, prompt: str, num_questions: int = 3) -> str:
+    def generate_response(self, prompt: str, num_questions: int = 3, temperature_bump: float = 0.0) -> str:
         """
         Generates a text completion for the provided prompt.
 
         Args:
             prompt: The fully compiled prompt string.
-            num_questions: Expected number of questions — used to size max_tokens
-                           so the output is never cut short mid-JSON.
+            num_questions: Expected number of questions — used to size max_tokens.
+            temperature_bump: Added to base temperature (0.2) on retries to get
+                              different output when the first attempt was malformed.
         """
         if self.mock_mode:
             logger.info("Generating dynamic mock STEM questions from context...")
             return self._generate_mock_questions(prompt, num_questions=num_questions)
 
         model = self._get_model()
-        if self.mock_mode: # check if model loading failed and flagged mock_mode
+        if self.mock_mode:
             return self._generate_mock_questions(prompt, num_questions=num_questions)
 
-        # Each MCQ question is roughly 180 tokens of JSON; short-answer ~120.
-        # Use 200 per question as a safe ceiling, with a 150-token base overhead.
         max_tokens = 150 + (num_questions * 200)
+        temperature = min(0.2 + temperature_bump, 0.9)
 
         try:
-            logger.info(f"Running local GGUF inference (num_questions={num_questions}, max_tokens={max_tokens})...")
+            logger.info(f"Running local GGUF inference (num_questions={num_questions}, max_tokens={max_tokens}, temp={temperature:.2f})...")
             output = model(
                 prompt,
                 max_tokens=max_tokens,
-                temperature=0.2,      # low temp for structured correctness
+                temperature=temperature,
                 top_p=0.95,
-                # Stop on Qwen's turn-end tokens and runaway whitespace.
-                # Do NOT include ``` — validator handles markdown fences.
                 stop=["<|im_end|>", "<|im_start|>", "\n\n\n\n"],
             )
             response_text = output["choices"][0]["text"].strip()
@@ -100,7 +98,7 @@ class LlmEngine:
             logger.error(f"Error during GGUF model inference: {str(e)}")
             raise RuntimeError(f"LLM inference failed: {str(e)}") from e
 
-    def generate_response_stream(self, prompt: str, num_questions: int = 3):
+    def generate_response_stream(self, prompt: str, num_questions: int = 3, temperature_bump: float = 0.0):
         """
         Generator version of generate_response — yields raw text chunks as they
         are produced by llama.cpp so the caller can stream them to the client.
@@ -116,19 +114,16 @@ class LlmEngine:
             yield self._generate_mock_questions(prompt, num_questions=num_questions)
             return
 
-        max_tokens = 100 + (num_questions * 160)
-        logger.info(f"Running streaming GGUF inference (num_questions={num_questions}, max_tokens={max_tokens})...")
+        max_tokens = 150 + (num_questions * 200)
+        temperature = min(0.2 + temperature_bump, 0.9)
+        logger.info(f"Running streaming GGUF inference (num_questions={num_questions}, max_tokens={max_tokens}, temp={temperature:.2f})...")
 
         try:
             stream = model(
                 prompt,
                 max_tokens=max_tokens,
-                temperature=0.2,
+                temperature=temperature,
                 top_p=0.95,
-                # Stop on Qwen's turn-end tokens and runaway whitespace.
-                # Do NOT include ``` here — if the model wraps JSON in a code
-                # fence the validator's markdown-unwrap step handles it; stopping
-                # on ``` would cut the output before the JSON even starts.
                 stop=["<|im_end|>", "<|im_start|>", "\n\n\n\n"],
                 stream=True,
             )
