@@ -50,7 +50,7 @@ const fsStorage: StateStorage = {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      apiUrl: 'http://10.205.140.106:5000', // Default to your laptop's local IP
+      apiUrl: 'http://10.25.116.200:5000', // Static IP — set permanently via Windows adapter settings
       defaultSubject: 'Physics',
       defaultDifficulty: 'Medium',
       defaultQuestionType: 'mcq',
