@@ -21,13 +21,17 @@ export const uploadImageForOcr = async (
   lang: string = 'en'
 ): Promise<OcrResponse> => {
   const formData = new FormData();
-  const filename = imageUri.split('/').pop() || `upload_${Date.now()}.jpg`;
+  const filename = imageUri.split('/').pop()?.split('?')[0] || `upload_${Date.now()}.jpg`;
 
-  // React Native FormData upload schema requires mapping file details as an object
+  // Normalise URI — on Android, gallery picker returns content:// URIs.
+  // React Native's FormData handles both file:// and content:// but the
+  // type must always be set explicitly or some Android versions drop the body.
+  const mimeType = filename.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+
   formData.append('image', {
     uri: imageUri,
     name: filename,
-    type: 'image/jpeg',
+    type: mimeType,
   } as any);
   
   formData.append('lang', lang);
@@ -36,6 +40,8 @@ export const uploadImageForOcr = async (
     headers: {
       'Content-Type': 'multipart/form-data',
     },
+    // OCR can take 60-90s on first run — override the global timeout for this call
+    timeout: 300000,
   });
 
   return response.data;
