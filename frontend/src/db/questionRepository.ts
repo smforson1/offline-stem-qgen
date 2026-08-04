@@ -10,21 +10,20 @@ export const questionRepository = {
    */
   saveQuestions: async (questions: Question[], sessionId: string): Promise<void> => {
     const db = await getDB();
-    
-    // Execute inside a single transaction to maintain atomicity and performance
-    await db.transaction(async (tx: any) => {
-      for (let i = 0; i < questions.length; i++) {
-        const q = questions[i];
-        const qId = q.id || `q_${sessionId}_${i}`;
-        const optionsJson = q.options ? JSON.stringify(q.options) : null;
 
-        await tx.executeSql(
-          `INSERT OR REPLACE INTO questions (id, session_id, question_text, correct_answer, explanation, options_json)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [qId, sessionId, q.question_text, q.correct_answer, q.explanation, optionsJson]
-        );
-      }
-    });
+    // react-native-sqlite-storage transactions do not support async callbacks.
+    // Run each INSERT sequentially outside a transaction wrapper instead.
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      const qId = q.id || `q_${sessionId}_${i}`;
+      const optionsJson = q.options ? JSON.stringify(q.options) : null;
+
+      await db.executeSql(
+        `INSERT OR REPLACE INTO questions (id, session_id, question_text, correct_answer, explanation, options_json)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [qId, sessionId, q.question_text, q.correct_answer, q.explanation, optionsJson],
+      );
+    }
   },
 
   /**
@@ -69,17 +68,15 @@ export const questionRepository = {
     sessionId: string
   ): Promise<void> => {
     const db = await getDB();
-    
-    await db.transaction(async (tx: any) => {
-      for (const ans of answers) {
-        const ansId = `ans_${sessionId}_${ans.questionId}`;
-        await tx.executeSql(
-          `INSERT OR REPLACE INTO answers (id, session_id, question_id, selected_answer, is_correct)
-           VALUES (?, ?, ?, ?, ?)`,
-          [ansId, sessionId, ans.questionId, ans.selectedAnswer, ans.isCorrect ? 1 : 0]
-        );
-      }
-    });
+
+    for (const ans of answers) {
+      const ansId = `ans_${sessionId}_${ans.questionId}`;
+      await db.executeSql(
+        `INSERT OR REPLACE INTO answers (id, session_id, question_id, selected_answer, is_correct)
+         VALUES (?, ?, ?, ?, ?)`,
+        [ansId, sessionId, ans.questionId, ans.selectedAnswer, ans.isCorrect ? 1 : 0],
+      );
+    }
   },
 
   /**

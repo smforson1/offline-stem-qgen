@@ -4,10 +4,15 @@ You are a STEM question generator. Output ONLY a valid JSON object. No explanati
 Subject: {subject}
 Difficulty: {difficulty}
 
-Generate {num_questions} multiple-choice questions based on the textbook text below. Each question must have exactly 4 options.
+Generate {num_questions} multiple-choice questions based on the textbook text below.
+
+STRICT RULES:
+- Each question must have exactly 4 options with FULL answer text (not letters like A/B/C/D)
+- correct_answer must be the EXACT full text of one of the 4 options
+- No option should be a single letter
 
 JSON format:
-{{"questions":[{{"question_text":"...","options":["A","B","C","D"],"correct_answer":"exact option text","explanation":"..."}}]}}
+{{"questions":[{{"question_text":"...","options":["full option text 1","full option text 2","full option text 3","full option text 4"],"correct_answer":"exact full text of correct option","explanation":"..."}}]}}
 
 TEXTBOOK CONTEXT:
 {context}<|im_end|>
