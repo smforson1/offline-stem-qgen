@@ -58,8 +58,7 @@ export const QuestionScreen: React.FC = () => {
       // Normalise both sides: trim whitespace and collapse internal spaces
       const normalise = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
       const isCorrect = normalise(studentAns) === normalise(q.correct_answer);
-      if (isCorrect) correctCount++;
-      // Use the question's DB id if available, otherwise fall back to the generated key
+      if (isCorrect) correctCount++;      // Use the question's DB id if available, otherwise fall back to the generated key
       const questionId = q.id || `q_${sessionId}_${idx}`;
       return { questionId, selectedAnswer: studentAns, isCorrect };
     });

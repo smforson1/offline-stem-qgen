@@ -118,21 +118,34 @@ class Validator:
                     else:
                         clean_opts.append(f"Option {opt_idx+1}")
                 
-                # Check if correct answer matches one of the options (case-insensitive fuzzy match)
+                # Normalise correct answer against options using case-insensitive
+                # whitespace-collapsed comparison so minor formatting differences
+                # from the model don't cause false "wrong" results.
+                def normalise(s: str) -> str:
+                    return ' '.join(s.lower().split())
+
                 clean_corr_ans = corr_ans.strip()
-                
-                if clean_corr_ans not in clean_opts:
-                    matched_opt = None
+                norm_corr = normalise(clean_corr_ans)
+
+                # Try exact normalised match first
+                matched_opt = None
+                for o in clean_opts:
+                    if normalise(o) == norm_corr:
+                        matched_opt = o
+                        break
+
+                # Fall back to substring match
+                if not matched_opt:
                     for o in clean_opts:
-                        if clean_corr_ans.lower() == o.lower() or clean_corr_ans.lower() in o.lower():
+                        if norm_corr in normalise(o) or normalise(o) in norm_corr:
                             matched_opt = o
                             break
-                    if matched_opt:
-                        validated_q["correct_answer"] = matched_opt
-                    else:
-                        # Just use the first option as correct rather than crashing
-                        logger.warning(f"Question {idx+1} correct answer not found in options. Using first option.")
-                        validated_q["correct_answer"] = clean_opts[0]
+
+                if matched_opt:
+                    validated_q["correct_answer"] = matched_opt
+                else:
+                    logger.warning(f"Question {idx+1} correct answer not found in options. Using first option.")
+                    validated_q["correct_answer"] = clean_opts[0]
                 
                 validated_q["options_json"] = json.dumps(clean_opts)
             else:

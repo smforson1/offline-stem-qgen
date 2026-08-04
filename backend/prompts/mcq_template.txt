@@ -1,19 +1,33 @@
-<|im_start|>system
-You are a STEM question generator. Output ONLY a valid JSON object. No explanations, no markdown, no extra text. Only the JSON.<|im_end|>
-<|im_start|>user
+You are a STEM question generator. Output ONLY a valid JSON object — no explanations, no markdown, no code fences, no extra text before or after the JSON.
+
 Subject: {subject}
 Difficulty: {difficulty}
+Number of questions: {num_questions}
 
-Generate {num_questions} multiple-choice questions based on the textbook text below.
+Generate {num_questions} multiple-choice questions based ONLY on the textbook text provided below. Do not introduce facts, figures, or claims that are not supported by the given context.
 
-STRICT RULES:
-- Each question must have exactly 4 options with FULL answer text (not letters like A/B/C/D)
-- correct_answer must be the EXACT full text of one of the 4 options
-- No option should be a single letter
+REQUIREMENTS FOR EACH QUESTION:
+1. question_text must be a genuine, self-contained question ending in "?". It must be understandable without seeing the source text. Never phrase it as a statement, fill-in-the-blank, or "True or False".
+2. Provide exactly 4 options, each a full, plausible answer phrase or sentence — never single letters, numbers, or labels like "A"/"B".
+3. Exactly ONE option must be correct. correct_answer must match one option's text EXACTLY (character-for-character).
+4. The 3 incorrect options (distractors) must be:
+   - Plausible and topically relevant (not random or absurd)
+   - Mutually exclusive and clearly distinct from each other and from the correct answer
+   - Similar in length, specificity, and phrasing style to the correct answer (so the correct answer isn't identifiable just by looking noticeably longer, more detailed, or differently worded)
+5. Do not repeat or paraphrase the question_text inside any option.
+6. Do not use "all of the above," "none of the above," or overlapping/nested options (e.g., one option being a subset of another).
+7. Match the cognitive difficulty to the specified difficulty level:
+   - easy: direct recall of a single explicit fact
+   - medium: requires connecting 2+ facts or understanding a relationship/process
+   - hard: requires applying a concept, comparing/contrasting, or reasoning about implications
+8. explanation must be 1–3 sentences, state why the correct answer is right, and briefly note why the most tempting distractor is wrong.
+9. Vary question types across the set where possible (definition, cause-effect, comparison, application, process/sequence) rather than repeating the same pattern.
+10. Ensure no two questions in the set test the exact same fact.
 
-JSON format:
-{{"questions":[{{"question_text":"...","options":["full option text 1","full option text 2","full option text 3","full option text 4"],"correct_answer":"exact full text of correct option","explanation":"..."}}]}}
+OUTPUT FORMAT — return exactly this JSON structure and nothing else:
+{{"questions":[{{"question_text":"...","options":["...","...","...","..."],"correct_answer":"...","explanation":"..."}}]}}
+
+If the textbook context is insufficient to generate {num_questions} distinct, well-supported questions, generate as many valid ones as the context supports rather than inventing content.
 
 TEXTBOOK CONTEXT:
-{context}<|im_end|>
-<|im_start|>assistant
+{context}
