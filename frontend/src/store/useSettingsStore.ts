@@ -50,7 +50,7 @@ const fsStorage: StateStorage = {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      apiUrl: 'http://192.168.43.100:5000', // Laptop static IP on phone hotspot network
+      apiUrl: 'http://10.238.11.200:5000', // Laptop static IP on Infinix HOT 20i hotspot network
       defaultSubject: 'Physics',
       defaultDifficulty: 'Medium',
       defaultQuestionType: 'mcq',
