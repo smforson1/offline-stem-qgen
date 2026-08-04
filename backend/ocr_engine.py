@@ -48,11 +48,10 @@ class OcrEngine:
                 device=self.device,
                 enable_mkldnn=self.enable_mkldnn,
                 use_textline_orientation=True,
-                # Downscale the longest image side to 960px before detection.
-                # Default is 2944px which is far more than needed for textbook
-                # pages and is the main reason OCR takes 80-90s. 960px cuts
-                # that to ~15-20s with no meaningful accuracy loss on clean text.
-                det_limit_side_len=960,
+                # Downscale the longest image side to 640px before detection.
+                # Lower than our previous 960px — trades a small amount of accuracy
+                # for significantly faster OCR on clean textbook images.
+                det_limit_side_len=640,
             )
             self._model = model
             # Cache globally
@@ -105,6 +104,23 @@ class OcrEngine:
         # 2. Get the model and predict
         model = self._get_model()
         try:
+            # Pre-resize large images before OCR — phone cameras produce 3000-4000px
+            # images which slow down detection significantly. Capping at 1200px on
+            # the longest side is enough for clean textbook text.
+            if isinstance(processed_input, str):
+                try:
+                    img = Image.open(processed_input)
+                    max_side = 1200
+                    w, h = img.size
+                    if max(w, h) > max_side:
+                        scale = max_side / max(w, h)
+                        new_w, new_h = int(w * scale), int(h * scale)
+                        img = img.resize((new_w, new_h), Image.LANCZOS)
+                        processed_input = np.array(img.convert('RGB'))
+                        logger.info(f"Pre-resized image from {w}x{h} to {new_w}x{new_h} for faster OCR.")
+                except Exception as resize_err:
+                    logger.warning(f"Image pre-resize failed, using original: {resize_err}")
+
             logger.info("Running PaddleOCR prediction...")
             results = model.predict(processed_input)
         except Exception as e:
