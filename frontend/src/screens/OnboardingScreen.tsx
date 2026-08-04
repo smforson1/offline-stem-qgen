@@ -62,6 +62,7 @@ export const OnboardingScreen: React.FC = () => {
         </View>
 
         {/* Buttons */}
+        <View style={styles.spacer} />
         <View style={styles.footer}>
           <TouchableOpacity
             activeOpacity={0.85}
@@ -85,7 +86,7 @@ export const OnboardingScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.surface },
-  scroll: { paddingHorizontal: 28, paddingTop: 20, paddingBottom: 40 },
+  scroll: { flexGrow: 1, paddingHorizontal: 28, paddingTop: 20, paddingBottom: 40 },
 
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   title: { fontSize: 18, fontFamily: Fonts.extraBold, color: Colors.textPrimary, letterSpacing: -0.5 },
@@ -100,11 +101,12 @@ const styles = StyleSheet.create({
   accentText: { color: Colors.primary },
   subtitle: { fontSize: 14, fontFamily: Fonts.regular, color: Colors.textMuted, lineHeight: 22, marginBottom: 24 },
 
-  features: { flexDirection: 'row', gap: 16, marginBottom: 32 },
+  features: { flexDirection: 'row', gap: 16, marginBottom: 24 },
   featureItem: { flex: 1, backgroundColor: Colors.card, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: Colors.border, shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 8, elevation: 2 },
   featureIconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   featureText: { fontSize: 13, fontFamily: Fonts.semiBold, color: Colors.textPrimary },
 
+  spacer: { flex: 1, minHeight: 16 },
   footer: { gap: 12 },
   primaryBtn: { backgroundColor: Colors.primary, paddingVertical: 18, borderRadius: 18, alignItems: 'center', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
   primaryBtnText: { fontSize: 16, fontFamily: Fonts.bold, color: Colors.textWhite },
