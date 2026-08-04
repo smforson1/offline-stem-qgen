@@ -50,7 +50,7 @@ const fsStorage: StateStorage = {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      apiUrl: 'http://10.25.116.200:5000', // Static IP — set permanently via Windows adapter settings
+      apiUrl: 'http://192.168.43.100:5000', // Laptop static IP on phone hotspot network
       defaultSubject: 'Physics',
       defaultDifficulty: 'Medium',
       defaultQuestionType: 'mcq',
