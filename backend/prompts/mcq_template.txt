@@ -5,7 +5,8 @@ Subject: {subject}
 Difficulty: {difficulty}
 Number of questions: {num_questions}
 
-Generate {num_questions} multiple-choice questions based ONLY on the textbook text provided below. Do not introduce facts, figures, or claims that are not supported by the given context.
+Generate {num_questions} multiple-choice questions based ONLY on the textbook text provided below.
+All questions MUST be framed within the context of {subject}. Use {subject} terminology, concepts, and notation where appropriate.
 
 REQUIREMENTS FOR EACH QUESTION:
 1. question_text must be a genuine, self-contained question ending in "?". Never a statement or fill-in-the-blank.

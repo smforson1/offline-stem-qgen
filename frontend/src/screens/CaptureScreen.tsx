@@ -139,9 +139,15 @@ export const CaptureScreen: React.FC = () => {
   };
 
   const handleMockCapture = async () => {
-    await processTextbookText(
-      "Newton's Second Law of Motion states that the acceleration of an object as produced by a net force is directly proportional to the magnitude of the net force, in the same direction as the net force, and inversely proportional to the mass of the object. F = m * a where F is Net Force, m is mass and a is acceleration."
-    );
+    const mockTexts: Record<string, string> = {
+      Physics: "Newton's Second Law of Motion states that the acceleration of an object as produced by a net force is directly proportional to the magnitude of the net force, in the same direction as the net force, and inversely proportional to the mass of the object. F = m * a where F is Net Force, m is mass and a is acceleration. The unit of force is the Newton (N). When multiple forces act on an object, the net force is the vector sum of all individual forces.",
+      Chemistry: "Atoms combine in simple whole-number ratios to form compounds, as stated by the Law of Definite Proportions. The periodic table organises elements by atomic number and electron configuration. Ionic bonds form when electrons are transferred between atoms, while covalent bonds involve the sharing of electrons. The molar mass of a substance is the mass of one mole (6.022 × 10²³ particles) of that substance.",
+      Biology: "Cells are the basic structural and functional units of all living organisms. The cell theory states that all organisms are composed of cells, the cell is the basic unit of life, and all cells arise from pre-existing cells. DNA carries genetic information in sequences of nucleotide bases. Photosynthesis occurs in chloroplasts where light energy is converted into chemical energy stored in glucose: 6CO₂ + 6H₂O → C₆H₁₂O₆ + 6O₂.",
+      Mathematics: "A quadratic equation is a polynomial equation of degree 2 in the form ax² + bx + c = 0, where a ≠ 0. The quadratic formula x = (-b ± √(b²-4ac)) / 2a gives the roots of the equation. The discriminant b²-4ac determines the nature of roots: positive gives two real roots, zero gives one repeated root, negative gives complex roots. The parabola y = ax² + bx + c opens upward when a > 0 and downward when a < 0.",
+      STEM: "Newton's Second Law of Motion states that the acceleration of an object as produced by a net force is directly proportional to the magnitude of the net force, in the same direction as the net force, and inversely proportional to the mass of the object. F = m * a where F is Net Force, m is mass and a is acceleration.",
+    };
+    const text = mockTexts[settings.defaultSubject] || mockTexts['STEM'];
+    await processTextbookText(text);
   };
 
   const handlePickFromGallery = async () => {
