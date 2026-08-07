@@ -207,4 +207,4 @@ class LlmEngine:
                     "explanation": explanation
                 })
                 
-        return json.dumps({"questions": questions}, indent=2)
+        return json.dumps({"questions": questions})
