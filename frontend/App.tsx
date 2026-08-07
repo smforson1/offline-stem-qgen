@@ -119,12 +119,11 @@ function MainTabs() {
 }
 
 function AppContent() {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const hasSeenOnboarding = useAuthStore((state) => state.hasSeenOnboarding);
 
   return (
     <NavigationContainer>
-      {isAuthenticated ? (
+      {hasSeenOnboarding ? (
         <Stack.Navigator
           initialRouteName="MainTabs"
           screenOptions={{
@@ -140,7 +139,7 @@ function AppContent() {
         </Stack.Navigator>
       ) : (
         <Auth.Navigator
-          initialRouteName={hasSeenOnboarding ? 'SignIn' : 'Onboarding'}
+          initialRouteName="Onboarding"
           screenOptions={{
             headerShown: false,
             cardStyle: { backgroundColor: Colors.surface },

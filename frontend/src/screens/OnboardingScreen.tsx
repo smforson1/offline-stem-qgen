@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { AuthStackParamList } from '../types/Navigation';
+import { useAuthStore } from '../store/useAuthStore';
 import { Colors, Fonts } from '../theme/colors';
 import { Cpu, Brain, WifiOff } from 'lucide-react-native';
 
@@ -15,6 +16,7 @@ type OnboardingScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'O
 
 export const OnboardingScreen: React.FC = () => {
   const navigation = useNavigation<OnboardingScreenNavigationProp>();
+  const setHasSeenOnboarding = useAuthStore((state) => state.setHasSeenOnboarding);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
@@ -61,17 +63,10 @@ export const OnboardingScreen: React.FC = () => {
         <View style={styles.footer}>
           <TouchableOpacity
             activeOpacity={0.85}
-            onPress={() => navigation.navigate('SignUp')}
+            onPress={() => setHasSeenOnboarding(true)}
             style={styles.primaryBtn}
           >
             <Text style={styles.primaryBtnText}>Get Started</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('SignIn')}
-            style={styles.secondaryBtn}
-          >
-            <Text style={styles.secondaryBtnText}>I already have an account</Text>
           </TouchableOpacity>
         </View>
       </View>
