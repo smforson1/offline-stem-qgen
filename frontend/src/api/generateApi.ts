@@ -71,11 +71,16 @@ export const generateQuestionsStream = async (
   const base = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
   const url = `${base}/generate/stream`;
 
+  // Allow 5 minutes — OCR + LLM on CPU can be slow on first run
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 300_000);
+
   let response: Response;
   try {
     response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         context_text: contextText,
         subject,
@@ -86,11 +91,17 @@ export const generateQuestionsStream = async (
       }),
     });
   } catch (e: any) {
-    onError(`Network error: ${e.message || 'Could not reach server'}`);
+    clearTimeout(timeoutId);
+    if (e?.name === 'AbortError') {
+      onError('Request timed out. The server is taking too long — try fewer questions or a shorter text.');
+    } else {
+      onError(`Network error: ${e.message || 'Could not reach server'}`);
+    }
     return;
   }
 
   if (!response.ok) {
+    clearTimeout(timeoutId);
     onError(`Server error: ${response.status} ${response.statusText}`);
     return;
   }
@@ -98,64 +109,94 @@ export const generateQuestionsStream = async (
   // React Native's fetch supports getReader() on the response body
   const reader = response.body?.getReader();
   if (!reader) {
+    clearTimeout(timeoutId);
     onError('Streaming not supported in this environment.');
     return;
   }
 
   const decoder = new TextDecoder();
   let buffer = '';
-
-  // Track the last progress index we emitted so we don't fire duplicates
   let lastProgressIndex = 0;
+  let gotDone = false;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, { stream: true });
 
-    // SSE lines arrive as "event: <type>\ndata: <json>\n\n"
-    // Split on the double-newline that terminates each SSE message
-    const messages = buffer.split('\n\n');
-    // Last element is either empty or an incomplete message — keep it in buffer
-    buffer = messages.pop() ?? '';
+      const messages = buffer.split('\n\n');
+      buffer = messages.pop() ?? '';
 
-    for (const message of messages) {
-      const lines = message.trim().split('\n');
-      let eventType = 'message';
-      let dataLine = '';
+      for (const message of messages) {
+        const lines = message.trim().split('\n');
+        let eventType = 'message';
+        let dataLine = '';
 
-      for (const line of lines) {
-        if (line.startsWith('event:')) {
-          eventType = line.slice('event:'.length).trim();
-        } else if (line.startsWith('data:')) {
-          dataLine = line.slice('data:'.length).trim();
-        }
-      }
-
-      if (!dataLine) continue;
-
-      try {
-        const payload = JSON.parse(dataLine);
-
-        if (eventType === 'progress') {
-          // Only fire if this is a new question (avoid duplicates from rapid tokens)
-          if (payload.question_index > lastProgressIndex) {
-            lastProgressIndex = payload.question_index;
-            onProgress(payload as StreamProgressEvent);
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            eventType = line.slice('event:'.length).trim();
+          } else if (line.startsWith('data:')) {
+            dataLine = line.slice('data:'.length).trim();
           }
-        } else if (eventType === 'done') {
-          onDone(payload as StreamDoneEvent);
-          reader.cancel();
-          return;
-        } else if (eventType === 'error') {
-          onError(payload.error || 'Unknown server error');
-          reader.cancel();
-          return;
         }
-      } catch {
-        // Malformed JSON in SSE data — skip and continue
+
+        if (!dataLine) continue;
+
+        try {
+          const payload = JSON.parse(dataLine);
+
+          if (eventType === 'progress') {
+            if (payload.question_index > lastProgressIndex) {
+              lastProgressIndex = payload.question_index;
+              onProgress(payload as StreamProgressEvent);
+            }
+          } else if (eventType === 'done') {
+            gotDone = true;
+            clearTimeout(timeoutId);
+            onDone(payload as StreamDoneEvent);
+            reader.cancel();
+            return;
+          } else if (eventType === 'error') {
+            clearTimeout(timeoutId);
+            onError(payload.error || 'Unknown server error');
+            reader.cancel();
+            return;
+          }
+        } catch {
+          // Malformed SSE data — skip
+        }
       }
+    }
+  } catch (e: any) {
+    clearTimeout(timeoutId);
+    if (!gotDone) {
+      onError(`Stream interrupted: ${e.message || 'Connection lost mid-generation'}`);
+    }
+    return;
+  }
+
+  clearTimeout(timeoutId);
+  // Stream ended without a done event — fall back to non-streaming endpoint
+  if (!gotDone) {
+    try {
+      onProgress({ question_index: 0, total: numQuestions });
+      const fallback = await apiClient.post<GenerateResponse>('/generate', {
+        context_text: contextText,
+        subject,
+        difficulty,
+        question_type: questionType,
+        num_questions: numQuestions,
+        session_id: sessionId,
+      });
+      if (fallback.data.success && fallback.data.questions?.length > 0) {
+        onDone({ session_id: fallback.data.session_id, questions: fallback.data.questions });
+      } else {
+        onError(fallback.data.error || 'Generation failed with no questions returned.');
+      }
+    } catch (e: any) {
+      onError(`Generation failed: ${e.message || 'Check server connection.'}`);
     }
   }
 };
