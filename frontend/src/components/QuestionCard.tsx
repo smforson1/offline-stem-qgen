@@ -99,7 +99,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                     {OPTION_LETTERS[idx]}
                   </Text>
                 </View>
-                <Text style={[styles.optionTextBase, textStyle]} numberOfLines={3}>
+                <Text style={[styles.optionTextBase, textStyle]}>
                   {option}
                 </Text>
                 <View style={[styles.radioBase, radioStyle]}>

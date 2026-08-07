@@ -23,7 +23,8 @@ export const QuestionScreen: React.FC = () => {
   const sessionStore = useSessionStore();
 
   useEffect(() => {
-    if (!sessionStore.activeSession || sessionStore.activeSession.id !== sessionId) loadSessionFromDb();
+    // Always load fresh from DB — don't rely on potentially stale store state
+    loadSessionFromDb();
   }, [sessionId]);
 
   const loadSessionFromDb = async () => {

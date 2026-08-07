@@ -88,10 +88,13 @@ export const CaptureScreen: React.FC = () => {
               raw_context: text,
               created_at: new Date().toISOString(),
             };
+            // Save session first (foreign key requirement), then all questions
             await sessionRepository.saveSession(newSession);
             await questionRepository.saveQuestions(questions, session_id);
+            // Start session store AFTER DB writes complete
             sessionStore.startSession(newSession, questions);
             setLoading(false);
+            // Navigate — QuestionScreen will reload from DB to ensure all questions are present
             navigation.replace('Question', { sessionId: session_id });
           } catch (e: any) {
             setLoading(false);
