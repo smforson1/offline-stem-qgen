@@ -50,7 +50,7 @@ const fsStorage: StateStorage = {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      apiUrl: 'http://10.238.11.200:5000', // Laptop static IP on Infinix HOT 20i hotspot network
+      apiUrl: 'http://LAPTOP-S1B9T1CV.local:5000', // mDNS hostname — works on any network without IP changes
       defaultSubject: 'Physics',
       defaultDifficulty: 'Medium',
       defaultQuestionType: 'mcq',

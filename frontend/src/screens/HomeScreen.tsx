@@ -7,8 +7,9 @@ import { useNavigation, useIsFocused, CommonActions } from '@react-navigation/na
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/Navigation';
 import { sessionRepository } from '../db/sessionRepository';
+import { useSettingsStore } from '../store/useSettingsStore';
 import { Colors, Fonts } from '../theme/colors';
-import { Settings, Camera, ClipboardList, FileText, ArrowRight } from 'lucide-react-native';
+import { Settings, Camera, ClipboardList, FileText, ArrowRight, Wifi, WifiOff } from 'lucide-react-native';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainTabs'>;
 
@@ -30,8 +31,20 @@ export const HomeScreen: React.FC = () => {
   const [avgScore, setAvgScore] = useState<number | null>(null);
   const [bestScore, setBestScore] = useState<number | null>(null);
   const [topSubject, setTopSubject] = useState<string | null>(null);
+  const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
+  const { apiUrl } = useSettingsStore();
 
-  useEffect(() => { if (isFocused) loadStats(); }, [isFocused]);
+  useEffect(() => { if (isFocused) { loadStats(); checkBackend(); } }, [isFocused]);
+
+  const checkBackend = async () => {
+    try {
+      const base = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
+      const res = await fetch(`${base}/health`, { signal: AbortSignal.timeout(4000) });
+      setBackendOnline(res.ok);
+    } catch {
+      setBackendOnline(false);
+    }
+  };
 
   const loadStats = async () => {
     try {
@@ -61,6 +74,25 @@ export const HomeScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+      {/* Backend connection status banner */}
+      {backendOnline === false && (
+        <TouchableOpacity
+          style={styles.offlineBanner}
+          onPress={() => { checkBackend(); navigation.navigate('Settings'); }}
+          activeOpacity={0.85}
+        >
+          <WifiOff size={14} color="#fff" />
+          <Text style={styles.offlineBannerText}>
+            Backend unreachable — tap to fix in Settings
+          </Text>
+        </TouchableOpacity>
+      )}
+      {backendOnline === true && (
+        <View style={styles.onlineBanner}>
+          <Wifi size={14} color={Colors.success} />
+          <Text style={styles.onlineBannerText}>Backend connected</Text>
+        </View>
+      )}
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
         {/* Header */}
@@ -141,6 +173,10 @@ export const HomeScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.surface },
+  offlineBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.error, paddingHorizontal: 16, paddingVertical: 10 },
+  offlineBannerText: { fontSize: 12, fontFamily: Fonts.semiBold, color: '#fff', flex: 1 },
+  onlineBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.successSoft, paddingHorizontal: 16, paddingVertical: 8 },
+  onlineBannerText: { fontSize: 11, fontFamily: Fonts.semiBold, color: Colors.success },
   scroll: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 32 },
 
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22, marginTop: 6 },
