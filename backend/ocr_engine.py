@@ -104,23 +104,6 @@ class OcrEngine:
         # 2. Get the model and predict
         model = self._get_model()
         try:
-            # Pre-resize large images before OCR — phone cameras produce 3000-4000px
-            # images which slow down detection significantly. Capping at 1200px on
-            # the longest side is enough for clean textbook text.
-            if isinstance(processed_input, str):
-                try:
-                    img = Image.open(processed_input)
-                    max_side = 1200
-                    w, h = img.size
-                    if max(w, h) > max_side:
-                        scale = max_side / max(w, h)
-                        new_w, new_h = int(w * scale), int(h * scale)
-                        img = img.resize((new_w, new_h), Image.LANCZOS)
-                        processed_input = np.array(img.convert('RGB'))
-                        logger.info(f"Pre-resized image from {w}x{h} to {new_w}x{new_h} for faster OCR.")
-                except Exception as resize_err:
-                    logger.warning(f"Image pre-resize failed, using original: {resize_err}")
-
             logger.info("Running PaddleOCR prediction...")
             results = model.predict(processed_input)
         except Exception as e:

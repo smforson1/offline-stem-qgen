@@ -32,6 +32,8 @@ logger = logging.getLogger("flask_app")
 # Initialize Flask app
 app = Flask(__name__)
 app.config.from_object(Config)
+# Reject uploads larger than 8 MB early — prevents long blocking reads of huge files
+app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024
 
 # ── OCR engine cache (one instance per language) ──────────────────────────────
 _ocr_engines: dict = {}
@@ -51,31 +53,55 @@ def cached_ocr(image_bytes: bytes, lang: str) -> dict:
     """
     Return OCR results for given image bytes. Results are cached by MD5 hash
     so repeated uploads of the same image skip the expensive OCR pipeline.
+    Image stays entirely in memory — no disk write.
     """
     key = hashlib.md5(image_bytes).hexdigest() + lang
     if key in _ocr_cache:
         logger.info(f"OCR cache hit for key {key[:8]}...")
         return _ocr_cache[key]
 
-    import tempfile
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-        tmp.write(image_bytes)
-        tmp_path = tmp.name
+    # Decode bytes → PIL Image → numpy array (no disk I/O)
+    import io as _io
+    from PIL import Image as _Image
+    import numpy as _np
     try:
-        engine = get_ocr_engine(lang)
-        result = engine.extract_text_from_image(tmp_path)
-    finally:
+        pil_img = _Image.open(_io.BytesIO(image_bytes)).convert('RGB')
+        # Pre-resize: cap longest side at 1200px for faster OCR
+        max_side = 1200
+        w, h = pil_img.size
+        if max(w, h) > max_side:
+            scale = max_side / max(w, h)
+            pil_img = pil_img.resize((int(w * scale), int(h * scale)), _Image.LANCZOS)
+            logger.info(f"Pre-resized image from {w}x{h} → {pil_img.size} for OCR.")
+        img_array = _np.array(pil_img)
+    except Exception as e:
+        logger.warning(f"In-memory image decode failed, falling back to temp file: {e}")
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+            tmp.write(image_bytes)
+            tmp_path = tmp.name
         try:
-            os.remove(tmp_path)
-        except Exception:
-            pass
+            engine = get_ocr_engine(lang)
+            result = engine.extract_text_from_image(tmp_path)
+            _store_ocr_cache(key, result)
+            return result
+        finally:
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
 
-    # Evict oldest entry if cache is full
+    engine = get_ocr_engine(lang)
+    result = engine.extract_text_from_image(img_array)
+    _store_ocr_cache(key, result)
+    return result
+
+def _store_ocr_cache(key: str, result: dict) -> None:
+    """Store result in OCR cache, evicting oldest entry if full."""
     if len(_ocr_cache) >= _OCR_CACHE_MAX:
         oldest = next(iter(_ocr_cache))
         del _ocr_cache[oldest]
     _ocr_cache[key] = result
-    return result
 
 # ── LLM engine and Prompt Builder ─────────────────────────────────────────────
 _llm_engine = None
@@ -106,9 +132,20 @@ def init_db():
         with open(schema_path, "r", encoding="utf-8") as f:
             schema_sql = f.read()
         conn.executescript(schema_sql)
+        # Add indexes for the most common queries — speeds up history and results loading
+        conn.executescript("""
+            CREATE INDEX IF NOT EXISTS idx_questions_session
+                ON questions(session_id);
+            CREATE INDEX IF NOT EXISTS idx_answers_session
+                ON answers(session_id);
+            CREATE INDEX IF NOT EXISTS idx_answers_question
+                ON answers(question_id);
+            CREATE INDEX IF NOT EXISTS idx_sessions_created
+                ON sessions(created_at DESC);
+        """)
         conn.commit()
         conn.close()
-        logger.info("SQLite Database tables verified/initialized successfully.")
+        logger.info("SQLite Database tables and indexes verified/initialized successfully.")
     except Exception as e:
         logger.error(f"Failed to initialize database: {str(e)}")
 
@@ -189,6 +226,7 @@ def ocr_endpoint():
     lang = request.form.get("lang", Config.OCR_LANG)
 
     try:
+        # Read entirely into memory — no disk write needed
         file_bytes = file.read()
         logger.info(f"Received image upload ({len(file_bytes)} bytes), lang={lang}")
         result = cached_ocr(file_bytes, lang)
@@ -442,6 +480,9 @@ def export():
 
 if __name__ == "__main__":
     init_db()
+
+    # In production (debug=False), reduce noisy werkzeug request logs to WARNING
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
     # Warm up OCR engine at startup so the first scan doesn't pay the model-loading cost
     logger.info("Warming up OCR engine for default language...")
