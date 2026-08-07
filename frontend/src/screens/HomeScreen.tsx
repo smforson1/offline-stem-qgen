@@ -67,7 +67,7 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Good Day! 👋</Text>
-            <Text style={styles.appTitle}>STEM QGen</Text>
+            <Text style={styles.appTitle}>ScanQ</Text>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.settingsBtn}>
             <Settings size={22} color={Colors.textPrimary} />

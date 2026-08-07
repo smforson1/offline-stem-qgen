@@ -21,7 +21,7 @@ export const OnboardingScreen: React.FC = () => {
       <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>STEM QGen</Text>
+          <Text style={styles.title}>ScanQ</Text>
           <View style={styles.badge}>
             <Text style={styles.badgeText}>BETA</Text>
           </View>

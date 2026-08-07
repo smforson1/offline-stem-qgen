@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "STEM QGen",
-    "slug": "stem-qgen",
+    "name": "ScanQ",
+    "slug": "scanq",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
