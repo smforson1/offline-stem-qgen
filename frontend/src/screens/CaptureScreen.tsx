@@ -14,7 +14,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useSessionStore } from '../store/useSessionStore';
 import { uploadImageForOcr } from '../api/ocrApi';
 import { generateQuestionsStream } from '../api/generateApi';
-import { generateWithGemini } from '../api/geminiApi';
+import { generateWithGemini, generateFromImageWithGemini } from '../api/geminiApi';
 import { sessionRepository } from '../db/sessionRepository';
 import { questionRepository } from '../db/questionRepository';
 import { ocrCacheRepository } from '../db/ocrCacheRepository';
@@ -59,6 +59,83 @@ export const CaptureScreen: React.FC = () => {
   const openAppSettings = () => {
     if (Platform.OS === 'android') Linking.openSettings();
     else Linking.openURL('app-settings:');
+  };
+
+  /**
+   * Online path: send image directly to Gemini vision — no OCR needed.
+   * Falls back to OCR + local LLM if Gemini fails.
+   */
+  const processImageFile = async (imageUri: string) => {
+    const geminiKey = settings.geminiApiKey?.trim();
+    let hasInternet = false;
+    if (geminiKey) {
+      try {
+        const ping = await fetch('https://www.gstatic.com/generate_204', {
+          signal: AbortSignal.timeout(3000),
+        });
+        hasInternet = ping.status === 204;
+      } catch { hasInternet = false; }
+    }
+
+    if (hasInternet && geminiKey) {
+      setLoading(true);
+      setLoadingStep('Gemini is reading and generating questions...');
+      const numQuestions = settings.defaultQuestionCount ?? 5;
+      const result = await generateFromImageWithGemini(
+        imageUri,
+        settings.defaultSubject,
+        settings.defaultDifficulty,
+        settings.defaultQuestionType,
+        numQuestions,
+        geminiKey,
+        (idx, total) => setLoadingStep(`Gemini: got question ${idx} of ${total}...`),
+      );
+
+      if (result.success && result.questions.length > 0) {
+        try {
+          setLoadingStep('Saving session...');
+          const sessionId = `sess_${Date.now().toString(36)}`;
+          const newSession = {
+            id: sessionId,
+            subject: settings.defaultSubject,
+            difficulty: settings.defaultDifficulty,
+            raw_context: `[Gemini Vision — image processed directly]`,
+            created_at: new Date().toISOString(),
+          };
+          await sessionRepository.saveSession(newSession);
+          await questionRepository.saveQuestions(result.questions, sessionId);
+          sessionStore.startSession(newSession, result.questions);
+          setLoading(false);
+          navigation.replace('Question', { sessionId });
+          return;
+        } catch (e: any) {
+          setLoading(false);
+          alert(`Failed to save session: ${e.message}`);
+          return;
+        }
+      }
+      // Gemini vision failed — fall through to OCR path
+      setLoadingStep('Gemini failed, falling back to local OCR...');
+    }
+
+    // Offline path: OCR → local LLM
+    try {
+      setLoading(true);
+      setLoadingStep('Running OCR on the image...');
+      const ocrRes = await uploadImageForOcr(imageUri);
+      if (!ocrRes.success || !ocrRes.full_text) throw new Error(ocrRes.error || 'Failed to extract text.');
+      await ocrCacheRepository.save({
+        id: String(Math.abs(imageUri.split('').reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0))),
+        uri_hint: imageUri.slice(-40),
+        full_text: ocrRes.full_text,
+        subject: settings.defaultSubject,
+        cached_at: new Date().toISOString(),
+      });
+      await processTextbookText(ocrRes.full_text);
+    } catch (e: any) {
+      setLoading(false);
+      alert(`Upload failed: ${e.message}`);
+    }
   };
 
   const processTextbookText = async (text: string) => {
@@ -165,18 +242,7 @@ export const CaptureScreen: React.FC = () => {
       setLoadingStep('Capturing page photo...');
       const snapshot = await cameraRef.current.takeSnapshot();
       const tempPath = await snapshot.saveToTemporaryFileAsync('jpg', 90);
-      setLoadingStep('Running OCR on the page...');
-      const ocrRes = await uploadImageForOcr(`file://${tempPath}`);
-      if (!ocrRes.success || !ocrRes.full_text) throw new Error(ocrRes.error || 'Failed to extract text.');
-      // Cache OCR result for offline regeneration
-      await ocrCacheRepository.save({
-        id: String(Math.abs(tempPath.split('').reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0))),
-        uri_hint: tempPath.slice(-40),
-        full_text: ocrRes.full_text,
-        subject: settings.defaultSubject,
-        cached_at: new Date().toISOString(),
-      });
-      await processTextbookText(ocrRes.full_text);
+      await processImageFile(`file://${tempPath}`);
     } catch (e: any) {
       setLoading(false);
       alert(`Capture failed: ${e.message}`);
@@ -209,24 +275,7 @@ export const CaptureScreen: React.FC = () => {
     });
     if (result.canceled || !result.assets || result.assets.length === 0) return;
     const uri = result.assets[0].uri;
-    try {
-      setLoading(true);
-      setLoadingStep('Running OCR on the image...');
-      const ocrRes = await uploadImageForOcr(uri);
-      if (!ocrRes.success || !ocrRes.full_text) throw new Error(ocrRes.error || 'Failed to extract text.');
-      // Cache OCR result for offline regeneration
-      await ocrCacheRepository.save({
-        id: String(Math.abs(uri.split('').reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0))),
-        uri_hint: uri.slice(-40),
-        full_text: ocrRes.full_text,
-        subject: settings.defaultSubject,
-        cached_at: new Date().toISOString(),
-      });
-      await processTextbookText(ocrRes.full_text);
-    } catch (e: any) {
-      setLoading(false);
-      alert(`Upload failed: ${e.message}`);
-    }
+    await processImageFile(uri);
   };
 
   // Reusable "Recent Scans" panel — shown when the user taps the Recent button
