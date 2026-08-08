@@ -14,6 +14,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useSessionStore } from '../store/useSessionStore';
 import { uploadImageForOcr } from '../api/ocrApi';
 import { generateQuestionsStream } from '../api/generateApi';
+import { generateWithGemini } from '../api/geminiApi';
 import { sessionRepository } from '../db/sessionRepository';
 import { questionRepository } from '../db/questionRepository';
 import { ocrCacheRepository } from '../db/ocrCacheRepository';
@@ -63,21 +64,69 @@ export const CaptureScreen: React.FC = () => {
   const processTextbookText = async (text: string) => {
     try {
       setLoading(true);
-      setLoadingStep('AI is generating questions...');
 
       const numQuestions = settings.defaultQuestionCount ?? 5;
+      const geminiKey = settings.geminiApiKey?.trim();
 
+      // Check internet by pinging a lightweight endpoint
+      let hasInternet = false;
+      if (geminiKey) {
+        try {
+          const ping = await fetch('https://www.gstatic.com/generate_204', {
+            signal: AbortSignal.timeout(3000),
+          });
+          hasInternet = ping.status === 204;
+        } catch {
+          hasInternet = false;
+        }
+      }
+
+      if (hasInternet && geminiKey) {
+        // ── Online path: use Gemini ──────────────────────────────────────
+        setLoadingStep('Using Gemini AI (online)...');
+        const result = await generateWithGemini(
+          text,
+          settings.defaultSubject,
+          settings.defaultDifficulty,
+          settings.defaultQuestionType,
+          numQuestions,
+          geminiKey,
+          (idx, total) => setLoadingStep(`Gemini: got question ${idx} of ${total}...`),
+        );
+
+        if (!result.success || result.questions.length === 0) {
+          // Gemini failed — fall through to offline path
+          setLoadingStep('Gemini failed, falling back to local AI...');
+        } else {
+          setLoadingStep('Saving session...');
+          const sessionId = `sess_${Date.now().toString(36)}`;
+          const newSession = {
+            id: sessionId,
+            subject: settings.defaultSubject,
+            difficulty: settings.defaultDifficulty,
+            raw_context: text,
+            created_at: new Date().toISOString(),
+          };
+          await sessionRepository.saveSession(newSession);
+          await questionRepository.saveQuestions(result.questions, sessionId);
+          sessionStore.startSession(newSession, result.questions);
+          setLoading(false);
+          navigation.replace('Question', { sessionId });
+          return;
+        }
+      }
+
+      // ── Offline path: use local Flask backend ────────────────────────
+      setLoadingStep('AI is generating questions...');
       await generateQuestionsStream(
         text,
         settings.defaultSubject,
         settings.defaultDifficulty,
         settings.defaultQuestionType,
         numQuestions,
-        // onProgress — update the overlay message as each question arrives
         ({ question_index, total }) => {
           setLoadingStep(`Got question ${question_index} of ${total}...`);
         },
-        // onDone — full list received, save and navigate
         async ({ session_id, questions }) => {
           try {
             setLoadingStep('Saving session to local storage...');
@@ -88,20 +137,16 @@ export const CaptureScreen: React.FC = () => {
               raw_context: text,
               created_at: new Date().toISOString(),
             };
-            // Save session first (foreign key requirement), then all questions
             await sessionRepository.saveSession(newSession);
             await questionRepository.saveQuestions(questions, session_id);
-            // Start session store AFTER DB writes complete
             sessionStore.startSession(newSession, questions);
             setLoading(false);
-            // Navigate — QuestionScreen will reload from DB to ensure all questions are present
             navigation.replace('Question', { sessionId: session_id });
           } catch (e: any) {
             setLoading(false);
             alert(`Failed to save session: ${e.message}`);
           }
         },
-        // onError
         (message) => {
           setLoading(false);
           alert(`Generation failed: ${message}`);

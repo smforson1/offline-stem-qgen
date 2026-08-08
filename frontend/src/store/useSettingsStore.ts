@@ -10,11 +10,13 @@ interface SettingsState {
   defaultDifficulty: string;
   defaultQuestionType: 'mcq' | 'short_answer';
   defaultQuestionCount: number;
+  geminiApiKey: string;
   setApiUrl: (url: string) => void;
   setDefaultSubject: (subject: string) => void;
   setDefaultDifficulty: (difficulty: string) => void;
   setDefaultQuestionType: (type: 'mcq' | 'short_answer') => void;
   setDefaultQuestionCount: (count: number) => void;
+  setGeminiApiKey: (key: string) => void;
 }
 
 // Custom storage provider using react-native-fs to persist settings on-device offline
@@ -50,16 +52,18 @@ const fsStorage: StateStorage = {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      apiUrl: 'http://10.0.2.2:5000', // Default — works for Android emulator; auto-discovery updates this at startup
+      apiUrl: 'http://10.0.2.2:5000',
       defaultSubject: 'Physics',
       defaultDifficulty: 'Medium',
       defaultQuestionType: 'mcq',
       defaultQuestionCount: 5,
+      geminiApiKey: '',
       setApiUrl: (url) => set({ apiUrl: url }),
       setDefaultSubject: (subject) => set({ defaultSubject: subject }),
       setDefaultDifficulty: (difficulty) => set({ defaultDifficulty: difficulty }),
       setDefaultQuestionType: (type) => set({ defaultQuestionType: type }),
       setDefaultQuestionCount: (count) => set({ defaultQuestionCount: count }),
+      setGeminiApiKey: (key) => set({ geminiApiKey: key }),
     }),
     {
       name: 'user-settings',

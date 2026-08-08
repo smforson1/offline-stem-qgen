@@ -9,7 +9,7 @@ import { RootStackParamList } from '../types/Navigation';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { Colors, Fonts } from '../theme/colors';
-import { Link2, Target, LogOut } from 'lucide-react-native';
+import { Link2, Target, LogOut, Zap } from 'lucide-react-native';
 
 type SettingsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Settings'>;
 
@@ -40,11 +40,13 @@ export const SettingsScreen: React.FC = () => {
   const settings = useSettingsStore();
   const authStore = useAuthStore();
   const [localUrl, setLocalUrl] = useState(settings.apiUrl);
+  const [localGeminiKey, setLocalGeminiKey] = useState(settings.geminiApiKey ?? '');
 
   const saveUrl = () => {
     let url = localUrl.trim();
     if (url && !url.startsWith('http://') && !url.startsWith('https://')) url = `http://${url}`;
     settings.setApiUrl(url);
+    settings.setGeminiApiKey(localGeminiKey.trim());
   };
 
   const handleProceed = () => { saveUrl(); navigation.navigate('Capture'); };
@@ -81,6 +83,33 @@ export const SettingsScreen: React.FC = () => {
             placeholder="e.g. http://192.168.4.1:5000" placeholderTextColor={Colors.textLight}
             style={styles.input} autoCapitalize="none" autoCorrect={false} keyboardType="url"
           />
+        </View>
+
+        {/* Gemini API card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <View style={[styles.cardIconBadge, { backgroundColor: '#FEF3C7' }]}>
+              <Zap size={20} color="#D97706" />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.cardTitle}>Gemini AI (Online — Optional)</Text>
+              <Text style={styles.cardSubtitle}>When internet is available, uses Gemini for faster generation. Leave blank to always use local AI.</Text>
+            </View>
+          </View>
+          <TextInput
+            value={localGeminiKey}
+            onChangeText={setLocalGeminiKey}
+            onBlur={saveUrl}
+            placeholder="Paste your Gemini API key here"
+            placeholderTextColor={Colors.textLight}
+            style={styles.input}
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry={true}
+          />
+          <Text style={[styles.cardSubtitle, { marginTop: 8 }]}>
+            Get a free key at aistudio.google.com/app/apikey
+          </Text>
         </View>
 
         {/* Presets card */}
