@@ -85,16 +85,18 @@ ${contextText}`;
  * Parses the raw Gemini response text into a validated Question array.
  */
 function parseGeminiResponse(rawText: string, questionType: 'mcq' | 'short_answer'): Question[] {
-  // Strip markdown fences if present
   let text = rawText.trim();
+
+  // Strip markdown fences if present (```json ... ``` or ``` ... ```)
   const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   if (fenceMatch) text = fenceMatch[1].trim();
 
-  // Find first { and parse from there
+  // Find the first { and last } to extract the JSON object
   const start = text.indexOf('{');
-  if (start === -1) throw new Error('No JSON found in Gemini response');
-
-  const data = JSON.parse(text.slice(start));
+  const end = text.lastIndexOf('}');
+  if (start === -1 || end === -1) throw new Error('No JSON object found in Gemini response');
+  text = text.slice(start, end + 1);
+  const data = JSON.parse(text);
   const questions: Question[] = [];
 
   for (const q of data.questions || []) {

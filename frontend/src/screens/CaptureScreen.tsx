@@ -114,8 +114,10 @@ export const CaptureScreen: React.FC = () => {
           return;
         }
       }
-      // Gemini vision failed — fall through to OCR path
-      setLoadingStep('Gemini failed, falling back to local OCR...');
+      // Gemini vision failed — show error and stop, don't silently fall back
+      setLoading(false);
+      alert(`Gemini failed: ${result.error || 'Unknown error'}. Check your API key in Settings or try again.`);
+      return;
     }
 
     // Offline path: OCR → local LLM
