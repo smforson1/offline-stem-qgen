@@ -46,7 +46,7 @@ class LlmEngine:
             from llama_cpp import Llama
             self._model = Llama(
                 model_path=self.model_path,
-                n_ctx=4096,     # Large enough for truncated input + up to 10 questions of output
+                n_ctx=6144,     # Large enough for input prompt + up to 10 questions of output (300 + 10*350 = 3800 output + ~600 input)
                 n_threads=8,    # Use 8 of the 10 available cores for inference
                 n_batch=512,    # Process more tokens in parallel
                 verbose=False
