@@ -46,7 +46,7 @@ class LlmEngine:
             from llama_cpp import Llama
             self._model = Llama(
                 model_path=self.model_path,
-                n_ctx=4096,     # Large enough for truncated input + 10 questions of output
+                n_ctx=4096,     # Large enough for truncated input + up to 10 questions of output
                 n_threads=8,    # Use 8 of the 10 available cores for inference
                 n_batch=512,    # Process more tokens in parallel
                 verbose=False
@@ -77,7 +77,7 @@ class LlmEngine:
         if self.mock_mode:
             return self._generate_mock_questions(prompt, num_questions=num_questions)
 
-        max_tokens = 150 + (num_questions * 200)
+        max_tokens = 300 + (num_questions * 350)
         temperature = min(0.2 + temperature_bump, 0.9)
 
         try:
@@ -114,7 +114,7 @@ class LlmEngine:
             yield self._generate_mock_questions(prompt, num_questions=num_questions)
             return
 
-        max_tokens = 150 + (num_questions * 200)
+        max_tokens = 300 + (num_questions * 350)
         temperature = min(0.2 + temperature_bump, 0.9)
         logger.info(f"Running streaming GGUF inference (num_questions={num_questions}, max_tokens={max_tokens}, temp={temperature:.2f})...")
 
