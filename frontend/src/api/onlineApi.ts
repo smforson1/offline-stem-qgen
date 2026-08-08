@@ -125,7 +125,7 @@ async function callGroq(
       model,
       messages,
       temperature: 0.2,
-      max_tokens: 150 + numQuestions * 220,
+      max_tokens: 300 + numQuestions * 350,
     }),
   });
 
