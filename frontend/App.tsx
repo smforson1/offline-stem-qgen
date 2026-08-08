@@ -21,6 +21,7 @@ import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { SignUpScreen } from './src/screens/SignUpScreen';
 import { useAuthStore } from './src/store/useAuthStore';
+import { autoDiscoverBackend } from './src/store/useSettingsStore';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { CaptureScreen } from './src/screens/CaptureScreen';
@@ -164,6 +165,11 @@ export default function App() {
     Poppins_800ExtraBold,
     Poppins_900Black,
   });
+
+  // Try to auto-discover the backend on startup — works for both emulator and physical device
+  React.useEffect(() => {
+    autoDiscoverBackend();
+  }, []);
 
   if (!fontsLoaded) {
     return (

@@ -50,7 +50,7 @@ const fsStorage: StateStorage = {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      apiUrl: 'http://LAPTOP-S1B9T1CV.local:5000', // mDNS hostname — works on any network without IP changes
+      apiUrl: 'http://10.0.2.2:5000', // Default — works for Android emulator; auto-discovery updates this at startup
       defaultSubject: 'Physics',
       defaultDifficulty: 'Medium',
       defaultQuestionType: 'mcq',
@@ -67,3 +67,49 @@ export const useSettingsStore = create<SettingsState>()(
     }
   )
 );
+
+/**
+ * Tries a list of candidate backend URLs and updates the store with the first
+ * one that responds to /health. Call this once on app startup.
+ *
+ * Priority order:
+ *  1. Android emulator alias (10.0.2.2) — works when running on emulator
+ *  2. mDNS hostname — works when on same LAN as the laptop
+ *  3. Current stored URL — user's manual setting, used as final fallback
+ */
+export const autoDiscoverBackend = async (): Promise<void> => {
+  const { apiUrl, setApiUrl } = useSettingsStore.getState();
+
+  const candidates = [
+    'http://10.0.2.2:5000',               // Android emulator
+    'http://LAPTOP-S1B9T1CV.local:5000',   // mDNS — physical device on same LAN
+    apiUrl,                                // user's current saved URL
+  ];
+
+  // Deduplicate
+  const seen = new Set<string>();
+  const unique = candidates.filter((u) => {
+    if (!u || seen.has(u)) return false;
+    seen.add(u);
+    return true;
+  });
+
+  for (const url of unique) {
+    try {
+      const base = url.endsWith('/') ? url.slice(0, -1) : url;
+      const res = await fetch(`${base}/health`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (res.ok) {
+        if (url !== apiUrl) {
+          setApiUrl(url);
+          console.log(`[autoDiscoverBackend] Connected via ${url}`);
+        }
+        return;
+      }
+    } catch {
+      // try next
+    }
+  }
+  console.log('[autoDiscoverBackend] No backend found — user must set URL manually');
+};
