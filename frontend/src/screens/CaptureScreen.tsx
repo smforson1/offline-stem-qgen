@@ -14,7 +14,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useSessionStore } from '../store/useSessionStore';
 import { uploadImageForOcr } from '../api/ocrApi';
 import { generateQuestionsStream } from '../api/generateApi';
-import { generateWithGemini, generateFromImageWithGemini } from '../api/geminiApi';
+import { generateFromImageOnline, generateFromTextOnline } from '../api/onlineApi';
 import { sessionRepository } from '../db/sessionRepository';
 import { questionRepository } from '../db/questionRepository';
 import { ocrCacheRepository } from '../db/ocrCacheRepository';
@@ -79,16 +79,16 @@ export const CaptureScreen: React.FC = () => {
 
     if (hasInternet && geminiKey) {
       setLoading(true);
-      setLoadingStep('Gemini is reading and generating questions...');
+      setLoadingStep('Groq AI is reading and generating questions...');
       const numQuestions = settings.defaultQuestionCount ?? 5;
-      const result = await generateFromImageWithGemini(
+      const result = await generateFromImageOnline(
         imageUri,
         settings.defaultSubject,
         settings.defaultDifficulty,
         settings.defaultQuestionType,
         numQuestions,
         geminiKey,
-        (idx, total) => setLoadingStep(`Gemini: got question ${idx} of ${total}...`),
+        (idx, total) => setLoadingStep(`Groq: got question ${idx} of ${total}...`),
       );
 
       if (result.success && result.questions.length > 0) {
@@ -116,7 +116,7 @@ export const CaptureScreen: React.FC = () => {
       }
       // Gemini vision failed — show error and stop, don't silently fall back
       setLoading(false);
-      alert(`Gemini failed: ${result.error || 'Unknown error'}. Check your API key in Settings or try again.`);
+      alert(`Groq failed: ${result.error || 'Unknown error'}. Check your API key in Settings or try again.`);
       return;
     }
 
@@ -162,20 +162,20 @@ export const CaptureScreen: React.FC = () => {
 
       if (hasInternet && geminiKey) {
         // ── Online path: use Gemini ──────────────────────────────────────
-        setLoadingStep('Using Gemini AI (online)...');
-        const result = await generateWithGemini(
+      setLoadingStep('Using Groq AI (online)...');
+        const result = await generateFromTextOnline(
           text,
           settings.defaultSubject,
           settings.defaultDifficulty,
           settings.defaultQuestionType,
           numQuestions,
           geminiKey,
-          (idx, total) => setLoadingStep(`Gemini: got question ${idx} of ${total}...`),
+          (idx, total) => setLoadingStep(`Groq: got question ${idx} of ${total}...`),
         );
 
         if (!result.success || result.questions.length === 0) {
-          // Gemini failed — fall through to offline path
-          setLoadingStep('Gemini failed, falling back to local AI...');
+          // Groq failed — fall through to offline path
+          setLoadingStep('Groq failed, falling back to local AI...');
         } else {
           setLoadingStep('Saving session...');
           const sessionId = `sess_${Date.now().toString(36)}`;

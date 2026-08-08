@@ -92,8 +92,8 @@ export const SettingsScreen: React.FC = () => {
               <Zap size={20} color="#D97706" />
             </View>
             <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.cardTitle}>Gemini AI (Online — Optional)</Text>
-              <Text style={styles.cardSubtitle}>When internet is available, uses Gemini for faster generation. Leave blank to always use local AI.</Text>
+              <Text style={styles.cardTitle}>Groq AI (Online — Optional)</Text>
+              <Text style={styles.cardSubtitle}>When internet is available, uses Groq for faster generation (~3-5 seconds). Leave blank to always use local AI.</Text>
             </View>
           </View>
           <TextInput
@@ -108,7 +108,7 @@ export const SettingsScreen: React.FC = () => {
             secureTextEntry={true}
           />
           <Text style={[styles.cardSubtitle, { marginTop: 8 }]}>
-            Get a free key at aistudio.google.com/app/apikey
+            Get a free key at console.groq.com
           </Text>
         </View>
 
