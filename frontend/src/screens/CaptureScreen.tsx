@@ -1,7 +1,7 @@
 // Owner: S3 | Purpose: VisionCamera screen — captures textbook photo and triggers OCR pipeline
 
 import React, { useRef, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Linking, Platform, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Linking, Platform, ScrollView, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -19,7 +19,7 @@ import { questionRepository } from '../db/questionRepository';
 import { ocrCacheRepository } from '../db/ocrCacheRepository';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import { Colors, Fonts } from '../theme/colors';
-import { CameraOff, Lock, Ban, Image as ImageIcon, Clock } from 'lucide-react-native';
+import { CameraOff, Lock, Ban, Image as ImageIcon, Clock, SlidersHorizontal } from 'lucide-react-native';
 
 type CaptureScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Capture'>;
 
@@ -42,6 +42,7 @@ export const CaptureScreen: React.FC = () => {
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [recentScans, setRecentScans] = useState<import('../db/ocrCacheRepository').OcrCacheEntry[]>([]);
   const [showRecent, setShowRecent] = useState(false);
+  const [showQuizConfig, setShowQuizConfig] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -219,6 +220,56 @@ export const CaptureScreen: React.FC = () => {
     </View>
   );
 
+  // Quiz config bottom sheet
+  const QuizConfigPanel = () => (
+    <Modal visible={showQuizConfig} transparent animationType="slide" onRequestClose={() => setShowQuizConfig(false)}>
+      <TouchableOpacity style={styles.configBackdrop} activeOpacity={1} onPress={() => setShowQuizConfig(false)} />
+      <View style={styles.configSheet}>
+        <View style={styles.configHandle} />
+        <Text style={styles.configTitle}>Quiz Settings</Text>
+        <Text style={styles.configLabel}>SUBJECT</Text>
+        <View style={styles.configChipRow}>
+          {['Physics','Chemistry','Biology','Mathematics'].map((s) => (
+            <TouchableOpacity key={s} onPress={() => settings.setDefaultSubject(s)} activeOpacity={0.75}
+              style={[styles.configChip, settings.defaultSubject === s && styles.configChipActive]}>
+              <Text style={[styles.configChipText, settings.defaultSubject === s && styles.configChipTextActive]}>{s}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <Text style={styles.configLabel}>DIFFICULTY</Text>
+        <View style={styles.configChipRow}>
+          {['Easy','Medium','Hard'].map((d) => (
+            <TouchableOpacity key={d} onPress={() => settings.setDefaultDifficulty(d)} activeOpacity={0.75}
+              style={[styles.configChip, settings.defaultDifficulty === d && styles.configChipActive]}>
+              <Text style={[styles.configChipText, settings.defaultDifficulty === d && styles.configChipTextActive]}>{d}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <Text style={styles.configLabel}>FORMAT</Text>
+        <View style={styles.configChipRow}>
+          {[{label:'Multiple Choice',value:'mcq'},{label:'Short Answer',value:'short_answer'}].map((f) => (
+            <TouchableOpacity key={f.value} onPress={() => settings.setDefaultQuestionType(f.value as any)} activeOpacity={0.75}
+              style={[styles.configChip, settings.defaultQuestionType === f.value && styles.configChipActive]}>
+              <Text style={[styles.configChipText, settings.defaultQuestionType === f.value && styles.configChipTextActive]}>{f.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <Text style={styles.configLabel}>QUESTION COUNT</Text>
+        <View style={styles.configChipRow}>
+          {[3,5,10].map((n) => (
+            <TouchableOpacity key={n} onPress={() => settings.setDefaultQuestionCount(n)} activeOpacity={0.75}
+              style={[styles.configChip, settings.defaultQuestionCount === n && styles.configChipActive]}>
+              <Text style={[styles.configChipText, settings.defaultQuestionCount === n && styles.configChipTextActive]}>{n}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TouchableOpacity style={styles.configDoneBtn} onPress={() => setShowQuizConfig(false)} activeOpacity={0.85}>
+          <Text style={styles.configDoneBtnText}>Done</Text>
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  );
+
   // ── No camera device ──────────────────────────────────────────────────────
   if (!device) {
     return (
@@ -245,6 +296,10 @@ export const CaptureScreen: React.FC = () => {
             <TouchableOpacity onPress={handlePickFromGallery} activeOpacity={0.85} style={styles.secondaryBtn}>
               <ImageIcon size={16} color={Colors.primary} style={{ marginRight: 6 }} />
               <Text style={styles.secondaryBtnText}>Upload from Gallery</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowQuizConfig(true)} activeOpacity={0.75} style={styles.secondaryBtn}>
+              <SlidersHorizontal size={16} color={Colors.primary} style={{ marginRight: 6 }} />
+              <Text style={styles.secondaryBtnText}>{settings.defaultSubject} · {settings.defaultQuestionCount}Q · {settings.defaultDifficulty}</Text>
             </TouchableOpacity>
             {recentScans.length > 0 && (
               <TouchableOpacity onPress={() => setShowRecent((v) => !v)} activeOpacity={0.75} style={styles.ghostBtn}>
@@ -303,6 +358,10 @@ export const CaptureScreen: React.FC = () => {
               <ImageIcon size={16} color={Colors.primary} style={{ marginRight: 6 }} />
               <Text style={styles.secondaryBtnText}>Upload from Gallery</Text>
             </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowQuizConfig(true)} activeOpacity={0.75} style={styles.secondaryBtn}>
+              <SlidersHorizontal size={16} color={Colors.primary} style={{ marginRight: 6 }} />
+              <Text style={styles.secondaryBtnText}>{settings.defaultSubject} · {settings.defaultQuestionCount}Q · {settings.defaultDifficulty}</Text>
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.ghostBtn}>
               <Text style={styles.ghostBtnText}>Cancel</Text>
             </TouchableOpacity>
@@ -350,6 +409,12 @@ export const CaptureScreen: React.FC = () => {
             <Text style={styles.galleryBtnText}>Gallery</Text>
           </TouchableOpacity>
         </View>
+        {/* Quiz config floating button */}
+        <TouchableOpacity onPress={() => setShowQuizConfig(true)} style={styles.configFloatBtn} activeOpacity={0.85}>
+          <SlidersHorizontal size={14} color="#fff" />
+          <Text style={styles.configFloatBtnText}>{settings.defaultSubject} · {settings.defaultQuestionCount}Q</Text>
+        </TouchableOpacity>
+        <QuizConfigPanel />
         {showRecent && (
           <View style={{ position: 'absolute', bottom: 110, left: 16, right: 16, zIndex: 20 }}>
             <RecentScansPanel />
@@ -429,4 +494,20 @@ const styles = StyleSheet.create({
   recentItemSubject: { fontSize: 10, fontFamily: Fonts.bold, color: Colors.primary, textTransform: 'uppercase', letterSpacing: 0.3 },
   recentItemText: { fontSize: 12, fontFamily: Fonts.medium, color: Colors.textPrimary, lineHeight: 18 },
   recentItemDate: { fontSize: 10, fontFamily: Fonts.regular, color: Colors.textLight },
+
+  // Quiz config bottom sheet
+  configBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  configSheet: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  configHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginBottom: 18 },
+  configTitle: { fontSize: 18, fontFamily: Fonts.extraBold, color: Colors.textPrimary, marginBottom: 20 },
+  configLabel: { fontSize: 10, fontFamily: Fonts.bold, color: Colors.textMuted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 },
+  configChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  configChip: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.border },
+  configChipActive: { backgroundColor: Colors.primarySoft, borderColor: Colors.primary },
+  configChipText: { fontSize: 13, fontFamily: Fonts.medium, color: Colors.textMuted },
+  configChipTextActive: { fontFamily: Fonts.bold, color: Colors.primary },
+  configDoneBtn: { backgroundColor: Colors.primary, borderRadius: 16, paddingVertical: 15, alignItems: 'center', marginTop: 4, shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  configDoneBtnText: { fontSize: 15, fontFamily: Fonts.bold, color: Colors.textWhite },
+  configFloatBtn: { position: 'absolute', top: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, zIndex: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  configFloatBtnText: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontFamily: Fonts.semiBold },
 });
