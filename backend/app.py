@@ -183,12 +183,14 @@ def generate_with_retry(llm, prompt: str, question_type: str, num_questions: int
     for attempt in range(max_retries + 1):
         try:
             temperature_bump = attempt * 0.1
-            raw = llm.generate_response(prompt, num_questions=num_questions, temperature_bump=temperature_bump)
+            raw = llm.generate_response(prompt, num_questions=num_questions, question_type=question_type, temperature_bump=temperature_bump)
             return Validator.validate_and_parse_response(raw_llm_text=raw, question_type=question_type)
         except (ValueError, RuntimeError) as e:
             last_error = e
             logger.warning(f"Generation attempt {attempt + 1} failed: {e}. {'Retrying...' if attempt < max_retries else 'Giving up.'}")
-    raise last_error
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Question generation failed.")
 
 # ── CORS ───────────────────────────────────────────────────────────────────────
 @app.after_request
@@ -357,14 +359,16 @@ def generate_stream():
 
             llm = get_llm_engine()
             accumulated = ""
-            for token in llm.generate_response_stream(prompt, num_questions=num_questions):
+            last_yielded_n = 0
+            for token in llm.generate_response_stream(prompt, num_questions=num_questions, question_type=question_type):
                 accumulated += token
                 try:
                     partial = json.loads(accumulated + "}}")
                     n_so_far = len(partial.get("questions", []))
                 except Exception:
                     n_so_far = accumulated.count('"question_text"')
-                if n_so_far > 0:
+                if n_so_far > last_yielded_n:
+                    last_yielded_n = n_so_far
                     yield sse_event("progress", {"question_index": n_so_far, "total": num_questions})
 
             logger.info(f"Streaming complete. Accumulated {len(accumulated)} chars. Preview: {accumulated[:200]!r}")
@@ -382,10 +386,12 @@ def generate_stream():
                     logger.warning(f"Stream validation attempt {attempt+1} failed: {e}")
                     if attempt < 2:
                         accumulated = ""
-                        for token in llm.generate_response_stream(prompt, num_questions=num_questions, temperature_bump=(attempt+1)*0.1):
+                        for token in llm.generate_response_stream(prompt, num_questions=num_questions, question_type=question_type, temperature_bump=(attempt+1)*0.1):
                             accumulated += token
             if questions is None:
-                raise last_err
+                if last_err is not None:
+                    raise last_err
+                raise RuntimeError("Stream validation failed.")
 
             conn = get_db_connection()
             conn.execute(

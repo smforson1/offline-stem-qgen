@@ -6,6 +6,7 @@ import re
 import random
 import json
 from typing import Optional
+import cloud_client
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ class LlmEngine:
             self.model_path = model_path
             
         self._model = None
+        self._grammar = None
         self.mock_mode = False
         
         # Check if the GGUF model file exists, if not, activate mock fallback mode
@@ -32,6 +34,68 @@ class LlmEngine:
                 "LlmEngine is entering MOCK FALLBACK mode for development."
             )
             self.mock_mode = True
+
+    def _get_grammar(self, question_type: str = "mcq"):
+        """Loads and caches the JSON schema as a LlamaGrammar tailored for question_type."""
+        if not hasattr(self, "_grammars"):
+            self._grammars = {}
+        
+        q_type_key = "mcq" if question_type.lower() in ("mcq", "multiple_choice", "multiple-choice") else "short_answer"
+        if q_type_key in self._grammars:
+            return self._grammars[q_type_key]
+
+        try:
+            from llama_cpp import LlamaGrammar
+            if q_type_key == "mcq":
+                schema = {
+                    "type": "object",
+                    "properties": {
+                        "questions": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "question_text": {"type": "string"},
+                                    "options": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "minItems": 4,
+                                        "maxItems": 4
+                                    },
+                                    "correct_answer": {"type": "string"},
+                                    "explanation": {"type": "string"}
+                                },
+                                "required": ["question_text", "options", "correct_answer", "explanation"]
+                            }
+                        }
+                    },
+                    "required": ["questions"]
+                }
+            else:
+                schema = {
+                    "type": "object",
+                    "properties": {
+                        "questions": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "question_text": {"type": "string"},
+                                    "correct_answer": {"type": "string"},
+                                    "explanation": {"type": "string"}
+                                },
+                                "required": ["question_text", "correct_answer", "explanation"]
+                            }
+                        }
+                    },
+                    "required": ["questions"]
+                }
+            self._grammars[q_type_key] = LlamaGrammar.from_json_schema(json.dumps(schema))
+            logger.info(f"LlamaGrammar initialized for question_type={q_type_key}.")
+            return self._grammars[q_type_key]
+        except Exception as e:
+            logger.warning(f"Could not initialize LlamaGrammar: {e}. Generating without grammar.")
+            return None
 
     def _get_model(self):
         """Lazily loads the Llama model instance."""
@@ -44,14 +108,18 @@ class LlmEngine:
         logger.info(f"Loading local GGUF model from {self.model_path} on CPU...")
         try:
             from llama_cpp import Llama
+            # Use 4-6 threads on modern multi-core CPUs for optimal throughput without thread contention
+            n_threads = 4
+
             self._model = Llama(
                 model_path=self.model_path,
-                n_ctx=6144,     # Large enough for input prompt + up to 10 questions of output (300 + 10*350 = 3800 output + ~600 input)
-                n_threads=8,    # Use 8 of the 10 available cores for inference
+                n_ctx=4096,     # Sized for Qwen/Llama context window
+                n_threads=n_threads,
                 n_batch=512,    # Process more tokens in parallel
+                n_ubatch=512,
                 verbose=False
             )
-            logger.info("GGUF model loaded successfully.")
+            logger.info(f"GGUF model loaded successfully with {n_threads} inference threads.")
         except Exception as e:
             logger.error(f"Failed to load Llama GGUF model: {str(e)}")
             logger.warning("Falling back to MOCK mode due to model load failure.")
@@ -59,16 +127,28 @@ class LlmEngine:
             
         return self._model
 
-    def generate_response(self, prompt: str, num_questions: int = 3, temperature_bump: float = 0.0) -> str:
+    def generate_response(self, prompt: str, num_questions: int = 3, question_type: str = "mcq", temperature_bump: float = 0.0) -> str:
         """
         Generates a text completion for the provided prompt.
+        Attempts cloud API first if keys are configured, falling back to local GGUF.
 
         Args:
             prompt: The fully compiled prompt string.
             num_questions: Expected number of questions — used to size max_tokens.
-            temperature_bump: Added to base temperature (0.2) on retries to get
-                              different output when the first attempt was malformed.
+            question_type: 'mcq' or 'short_answer'.
+            temperature_bump: Added to base temperature (0.2) on retries.
         """
+        # 1. Try Cloud Generation first (fail-safe fallback)
+        if cloud_client.is_cloud_available():
+            try:
+                res = cloud_client.generate_cloud_response(prompt, question_type=question_type)
+                if res and res.strip():
+                    logger.info("Successfully generated response via Cloud API.")
+                    return res
+            except Exception as ce:
+                logger.warning(f"Cloud generation failed: {ce}. Falling back to local/mock engine.")
+
+        # 2. Local fallback / mock mode
         if self.mock_mode:
             logger.info("Generating dynamic mock STEM questions from context...")
             return self._generate_mock_questions(prompt, num_questions=num_questions)
@@ -77,18 +157,22 @@ class LlmEngine:
         if self.mock_mode:
             return self._generate_mock_questions(prompt, num_questions=num_questions)
 
-        max_tokens = 300 + (num_questions * 350)
-        temperature = min(0.2 + temperature_bump, 0.9)
+        max_tokens = 200 + (num_questions * 220)
+        temperature = min(0.2 + temperature_bump, 0.8)
+        grammar = self._get_grammar(question_type)
 
         try:
-            logger.info(f"Running local GGUF inference (num_questions={num_questions}, max_tokens={max_tokens}, temp={temperature:.2f})...")
-            output = model(
-                prompt,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                top_p=0.95,
-                stop=["<|im_end|>", "<|im_start|>", "\n\n\n\n"],
-            )
+            logger.info(f"Running local GGUF inference (num_questions={num_questions}, max_tokens={max_tokens}, temp={temperature:.2f}, grammar={'enabled' if grammar else 'disabled'})...")
+            gen_kwargs = {
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "top_p": 0.95,
+                "stop": ["<|im_end|>", "<|im_start|>", "<|endoftext|>", "\n\n\n\n"],
+            }
+            if grammar is not None:
+                gen_kwargs["grammar"] = grammar
+
+            output = model(prompt, **gen_kwargs)
             response_text = output["choices"][0]["text"].strip()
             if not response_text:
                 logger.warning("GGUF model returned empty response. Falling back to mock generator.")
@@ -98,12 +182,26 @@ class LlmEngine:
             logger.error(f"Error during GGUF model inference: {str(e)}")
             raise RuntimeError(f"LLM inference failed: {str(e)}") from e
 
-    def generate_response_stream(self, prompt: str, num_questions: int = 3, temperature_bump: float = 0.0):
+    def generate_response_stream(self, prompt: str, num_questions: int = 3, question_type: str = "mcq", temperature_bump: float = 0.0):
         """
-        Generator version of generate_response — yields raw text chunks as they
-        are produced by llama.cpp so the caller can stream them to the client.
-        Falls back to yielding the full mock response as a single chunk.
+        Generator version of generate_response — yields raw text chunks.
+        Attempts cloud streaming API first, falling back to local llama.cpp.
         """
+        # 1. Try Cloud Streaming first
+        if cloud_client.is_cloud_available():
+            try:
+                yielded_any = False
+                for token in cloud_client.generate_cloud_stream(prompt, question_type=question_type):
+                    if token:
+                        yielded_any = True
+                        yield token
+                if yielded_any:
+                    logger.info("Successfully streamed response via Cloud API.")
+                    return
+            except Exception as ce:
+                logger.warning(f"Cloud streaming failed: {ce}. Falling back to local/mock engine.")
+
+        # 2. Local fallback / mock mode
         if self.mock_mode:
             logger.info("Mock mode: yielding full mock response as single stream chunk...")
             yield self._generate_mock_questions(prompt, num_questions=num_questions)
@@ -114,19 +212,23 @@ class LlmEngine:
             yield self._generate_mock_questions(prompt, num_questions=num_questions)
             return
 
-        max_tokens = 300 + (num_questions * 350)
-        temperature = min(0.2 + temperature_bump, 0.9)
+        max_tokens = 200 + (num_questions * 220)
+        temperature = min(0.2 + temperature_bump, 0.8)
+        grammar = self._get_grammar(question_type)
         logger.info(f"Running streaming GGUF inference (num_questions={num_questions}, max_tokens={max_tokens}, temp={temperature:.2f})...")
 
         try:
-            stream = model(
-                prompt,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                top_p=0.95,
-                stop=["<|im_end|>", "<|im_start|>", "\n\n\n\n"],
-                stream=True,
-            )
+            gen_kwargs = {
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "top_p": 0.95,
+                "stop": ["<|im_end|>", "<|im_start|>", "<|endoftext|>", "\n\n\n\n"],
+                "stream": True,
+            }
+            if grammar is not None:
+                gen_kwargs["grammar"] = grammar
+
+            stream = model(prompt, **gen_kwargs)
             for chunk in stream:
                 token = chunk["choices"][0].get("text", "")
                 if token:

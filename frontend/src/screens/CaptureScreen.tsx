@@ -12,12 +12,13 @@ import * as ImagePicker from 'expo-image-picker';
 import { RootStackParamList } from '../types/Navigation';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useSessionStore } from '../store/useSessionStore';
-import { uploadImageForOcr } from '../api/ocrApi';
+import { recognizeText } from '../api/ocrService';
 import { generateQuestionsStream } from '../api/generateApi';
 import { sessionRepository } from '../db/sessionRepository';
 import { questionRepository } from '../db/questionRepository';
 import { ocrCacheRepository } from '../db/ocrCacheRepository';
 import { LoadingOverlay } from '../components/LoadingOverlay';
+import { StreamingProgressOverlay, StreamStage } from '../components/StreamingProgressOverlay';
 import { Colors, Fonts } from '../theme/colors';
 import { CameraOff, Lock, Ban, Image as ImageIcon, Clock, SlidersHorizontal } from 'lucide-react-native';
 
@@ -38,7 +39,8 @@ export const CaptureScreen: React.FC = () => {
   const sessionStore = useSessionStore();
 
   const [loading, setLoading] = useState(false);
-  const [loadingStep, setLoadingStep] = useState('');
+  const [streamStage, setStreamStage] = useState<StreamStage>('ocr');
+  const [questionsDone, setQuestionsDone] = useState(0);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [recentScans, setRecentScans] = useState<import('../db/ocrCacheRepository').OcrCacheEntry[]>([]);
   const [showRecent, setShowRecent] = useState(false);
@@ -64,7 +66,8 @@ export const CaptureScreen: React.FC = () => {
   const processTextbookText = async (text: string) => {
     try {
       setLoading(true);
-      setLoadingStep('AI is generating questions...');
+      setStreamStage('generating');
+      setQuestionsDone(0);
 
       const numQuestions = settings.defaultQuestionCount ?? 5;
 
@@ -74,14 +77,14 @@ export const CaptureScreen: React.FC = () => {
         settings.defaultDifficulty,
         settings.defaultQuestionType,
         numQuestions,
-        // onProgress — update the overlay message as each question arrives
-        ({ question_index, total }) => {
-          setLoadingStep(`Got question ${question_index} of ${total}...`);
+        // onProgress — update questions counter as each question arrives via SSE
+        ({ question_index }) => {
+          setQuestionsDone(question_index);
         },
         // onDone — full list received, save and navigate
         async ({ session_id, questions }) => {
           try {
-            setLoadingStep('Saving session to local storage...');
+            setStreamStage('saving');
             const newSession = {
               id: session_id,
               subject: settings.defaultSubject,
@@ -118,15 +121,15 @@ export const CaptureScreen: React.FC = () => {
     if (!cameraRef.current) return;
     try {
       setLoading(true);
-      setLoadingStep('Capturing page photo...');
+      setStreamStage('ocr');
+      setQuestionsDone(0);
       const snapshot = await cameraRef.current.takeSnapshot();
       const tempPath = await snapshot.saveToTemporaryFileAsync('jpg', 90);
-      setLoadingStep('Running OCR on the page...');
-      const ocrRes = await uploadImageForOcr(`file://${tempPath}`);
+      const ocrRes = await recognizeText(`file://${tempPath}`);
       if (!ocrRes.success || !ocrRes.full_text) throw new Error(ocrRes.error || 'Failed to extract text.');
       // Cache OCR result for offline regeneration
       await ocrCacheRepository.save({
-        id: String(Math.abs(tempPath.split('').reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0))),
+        id: String(Math.abs(tempPath.split('').reduce((h: number, c: string) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0))),
         uri_hint: tempPath.slice(-40),
         full_text: ocrRes.full_text,
         subject: settings.defaultSubject,
@@ -167,12 +170,13 @@ export const CaptureScreen: React.FC = () => {
     const uri = result.assets[0].uri;
     try {
       setLoading(true);
-      setLoadingStep('Running OCR on the image...');
-      const ocrRes = await uploadImageForOcr(uri);
+      setStreamStage('ocr');
+      setQuestionsDone(0);
+      const ocrRes = await recognizeText(uri);
       if (!ocrRes.success || !ocrRes.full_text) throw new Error(ocrRes.error || 'Failed to extract text.');
       // Cache OCR result for offline regeneration
       await ocrCacheRepository.save({
-        id: String(Math.abs(uri.split('').reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0))),
+        id: String(Math.abs(uri.split('').reduce((h: number, c: string) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0))),
         uri_hint: uri.slice(-40),
         full_text: ocrRes.full_text,
         subject: settings.defaultSubject,
@@ -313,7 +317,12 @@ export const CaptureScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         </View>
-        <LoadingOverlay visible={loading} stepMessage={loadingStep} />
+        <StreamingProgressOverlay
+          visible={loading}
+          stage={streamStage}
+          questionsDone={questionsDone}
+          questionsTotal={settings.defaultQuestionCount ?? 5}
+        />
       </SafeAreaView>
     );
   }
@@ -367,7 +376,12 @@ export const CaptureScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         </View>
-        <LoadingOverlay visible={loading} stepMessage={loadingStep} />
+        <StreamingProgressOverlay
+          visible={loading}
+          stage={streamStage}
+          questionsDone={questionsDone}
+          questionsTotal={settings.defaultQuestionCount ?? 5}
+        />
       </SafeAreaView>
     );
   }
@@ -430,7 +444,12 @@ export const CaptureScreen: React.FC = () => {
           </TouchableOpacity>
         )}
       </View>
-      <LoadingOverlay visible={loading} stepMessage={loadingStep} />
+      <StreamingProgressOverlay
+        visible={loading}
+        stage={streamStage}
+        questionsDone={questionsDone}
+        questionsTotal={settings.defaultQuestionCount ?? 5}
+      />
     </SafeAreaView>
   );
 };
