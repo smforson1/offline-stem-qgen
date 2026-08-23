@@ -157,6 +157,23 @@ def get_db_connection():
     return conn
 
 # ── Utility helpers ────────────────────────────────────────────────────────────
+def auto_detect_num_questions(text: str) -> int:
+    """
+    Infers how many questions the AI should generate based on content richness.
+    Counts unique meaningful words in the OCR text as a proxy for concept density:
+      - < 80 unique words  → 3 questions (sparse slide)
+      - 80–180 unique words → 5 questions (typical slide)
+      - > 180 unique words  → 8 questions (content-rich page)
+    """
+    words = [w.lower() for w in text.split() if w.isalpha() and len(w) >= 4]
+    unique_count = len(set(words))
+    if unique_count < 80:
+        return 3
+    elif unique_count <= 180:
+        return 5
+    else:
+        return 8
+
 def auto_detect_difficulty(text: str) -> str:
     """
     Infers question difficulty from OCR text vocabulary complexity.
@@ -261,6 +278,10 @@ def generate():
     question_type = data.get("question_type", "mcq")
     num_questions = int(data.get("num_questions", 3))
 
+    if num_questions == 0:
+        num_questions = auto_detect_num_questions(context_text)
+        logger.info(f"AI-decided num_questions: {num_questions} (based on context richness)")
+
     if difficulty == "Auto" or not difficulty:
         difficulty = auto_detect_difficulty(context_text)
         logger.info(f"Auto-detected difficulty: {difficulty}")
@@ -335,6 +356,10 @@ def generate_stream():
     difficulty = data.get("difficulty", "Medium")
     question_type = data.get("question_type", "mcq")
     num_questions = int(data.get("num_questions", 3))
+
+    if num_questions == 0:
+        num_questions = auto_detect_num_questions(context_text)
+        logger.info(f"Stream: AI-decided num_questions: {num_questions} (based on context richness)")
 
     if difficulty == "Auto" or not difficulty:
         difficulty = auto_detect_difficulty(context_text)

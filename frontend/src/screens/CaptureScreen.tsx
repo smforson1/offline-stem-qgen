@@ -69,7 +69,8 @@ export const CaptureScreen: React.FC = () => {
       setStreamStage('generating');
       setQuestionsDone(0);
 
-      const numQuestions = settings.defaultQuestionCount ?? 5;
+      // 0 is the "AI decides" sentinel — backend auto-selects count from context richness
+      const numQuestions = settings.defaultQuestionCount;
 
       await generateQuestionsStream(
         text,
@@ -260,10 +261,12 @@ export const CaptureScreen: React.FC = () => {
         </View>
         <Text style={styles.configLabel}>QUESTION COUNT</Text>
         <View style={styles.configChipRow}>
-          {[3,5,10].map((n) => (
+          {([0, 3, 5, 10] as const).map((n) => (
             <TouchableOpacity key={n} onPress={() => settings.setDefaultQuestionCount(n)} activeOpacity={0.75}
               style={[styles.configChip, settings.defaultQuestionCount === n && styles.configChipActive]}>
-              <Text style={[styles.configChipText, settings.defaultQuestionCount === n && styles.configChipTextActive]}>{n}</Text>
+              <Text style={[styles.configChipText, settings.defaultQuestionCount === n && styles.configChipTextActive]}>
+                {n === 0 ? 'AI' : n}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -303,7 +306,7 @@ export const CaptureScreen: React.FC = () => {
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowQuizConfig(true)} activeOpacity={0.75} style={styles.secondaryBtn}>
               <SlidersHorizontal size={16} color={Colors.primary} style={{ marginRight: 6 }} />
-              <Text style={styles.secondaryBtnText}>{settings.defaultSubject} · {settings.defaultQuestionCount}Q · {settings.defaultDifficulty}</Text>
+              <Text style={styles.secondaryBtnText}>{settings.defaultSubject} · {settings.defaultQuestionCount === 0 ? 'AI' : `${settings.defaultQuestionCount}Q`} · {settings.defaultDifficulty}</Text>
             </TouchableOpacity>
             {recentScans.length > 0 && (
               <TouchableOpacity onPress={() => setShowRecent((v) => !v)} activeOpacity={0.75} style={styles.ghostBtn}>
@@ -369,7 +372,7 @@ export const CaptureScreen: React.FC = () => {
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowQuizConfig(true)} activeOpacity={0.75} style={styles.secondaryBtn}>
               <SlidersHorizontal size={16} color={Colors.primary} style={{ marginRight: 6 }} />
-              <Text style={styles.secondaryBtnText}>{settings.defaultSubject} · {settings.defaultQuestionCount}Q · {settings.defaultDifficulty}</Text>
+              <Text style={styles.secondaryBtnText}>{settings.defaultSubject} · {settings.defaultQuestionCount === 0 ? 'AI' : `${settings.defaultQuestionCount}Q`} · {settings.defaultDifficulty}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.ghostBtn}>
               <Text style={styles.ghostBtnText}>Cancel</Text>
@@ -380,7 +383,7 @@ export const CaptureScreen: React.FC = () => {
           visible={loading}
           stage={streamStage}
           questionsDone={questionsDone}
-          questionsTotal={settings.defaultQuestionCount ?? 5}
+          questionsTotal={settings.defaultQuestionCount === 0 ? 5 : settings.defaultQuestionCount}
         />
       </SafeAreaView>
     );
@@ -426,7 +429,7 @@ export const CaptureScreen: React.FC = () => {
         {/* Quiz config floating button */}
         <TouchableOpacity onPress={() => setShowQuizConfig(true)} style={styles.configFloatBtn} activeOpacity={0.85}>
           <SlidersHorizontal size={14} color="#fff" />
-          <Text style={styles.configFloatBtnText}>{settings.defaultSubject} · {settings.defaultQuestionCount}Q</Text>
+          <Text style={styles.configFloatBtnText}>{settings.defaultSubject} · {settings.defaultQuestionCount === 0 ? 'AI' : `${settings.defaultQuestionCount}Q`}</Text>
         </TouchableOpacity>
         <QuizConfigPanel />
         {showRecent && (
@@ -448,7 +451,7 @@ export const CaptureScreen: React.FC = () => {
         visible={loading}
         stage={streamStage}
         questionsDone={questionsDone}
-        questionsTotal={settings.defaultQuestionCount ?? 5}
+        questionsTotal={settings.defaultQuestionCount === 0 ? 5 : settings.defaultQuestionCount}
       />
     </SafeAreaView>
   );

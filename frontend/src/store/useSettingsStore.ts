@@ -9,6 +9,7 @@ interface SettingsState {
   defaultSubject: string;
   defaultDifficulty: string;
   defaultQuestionType: 'mcq' | 'short_answer';
+  /** 0 = "AI decides" — backend auto-selects count based on content richness */
   defaultQuestionCount: number;
   setApiUrl: (url: string) => void;
   setDefaultSubject: (subject: string) => void;
