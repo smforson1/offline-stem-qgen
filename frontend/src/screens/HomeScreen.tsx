@@ -137,7 +137,7 @@ export const HomeScreen: React.FC = () => {
         {/* Quick Actions */}
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.quickActionsRow}>
-          <QuickActionButton icon={Camera} label="New Quiz" onPress={() => navigation.navigate('Settings')} tint="#EEF2FF" />
+          <QuickActionButton icon={Camera} label="New Quiz" onPress={() => navigation.navigate('Capture')} tint="#EEF2FF" />
           <QuickActionButton icon={ClipboardList} label="History" onPress={goHistory} tint="#F5F3FF" />
           <QuickActionButton icon={Settings} label="Settings" onPress={() => navigation.navigate('Settings')} tint="#EEF2FF" />
           <QuickActionButton icon={FileText} label="Export" onPress={goHistory} tint="#F5F3FF" />
@@ -145,7 +145,7 @@ export const HomeScreen: React.FC = () => {
 
         {/* CTA cards */}
         <Text style={styles.sectionTitle}>Start Learning</Text>
-        <TouchableOpacity activeOpacity={0.88} onPress={() => navigation.navigate('Settings')} style={styles.ctaPrimary}>
+        <TouchableOpacity activeOpacity={0.88} onPress={() => navigation.navigate('Capture')} style={styles.ctaPrimary}>
           <View style={styles.ctaTextBlock}>
             <Text style={styles.ctaTitle}>Generate Quiz</Text>
             <Text style={styles.ctaDesc}>Point your camera at any textbook page. AI generates custom questions instantly.</Text>

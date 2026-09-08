@@ -45,12 +45,20 @@ export const CaptureScreen: React.FC = () => {
   const [recentScans, setRecentScans] = useState<import('../db/ocrCacheRepository').OcrCacheEntry[]>([]);
   const [showRecent, setShowRecent] = useState(false);
   const [showQuizConfig, setShowQuizConfig] = useState(false);
+  // Track whether the config sheet has been shown once this visit
+  const [configShownOnce, setConfigShownOnce] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       setPermissionDenied(false);
       ocrCacheRepository.getAll().then(setRecentScans).catch(() => {});
-    }, [])
+      // Auto-open the quiz config sheet on every visit so the user can
+      // review/adjust subject, difficulty, format and count before scanning
+      if (!configShownOnce) {
+        setShowQuizConfig(true);
+        setConfigShownOnce(true);
+      }
+    }, [configShownOnce])
   );
 
   const handleRequestPermission = async () => {
@@ -271,7 +279,7 @@ export const CaptureScreen: React.FC = () => {
           ))}
         </View>
         <TouchableOpacity style={styles.configDoneBtn} onPress={() => setShowQuizConfig(false)} activeOpacity={0.85}>
-          <Text style={styles.configDoneBtnText}>Done</Text>
+          <Text style={styles.configDoneBtnText}>Done — Ready to Scan</Text>
         </TouchableOpacity>
       </View>
     </Modal>
